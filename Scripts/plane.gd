@@ -1,0 +1,135 @@
+class_name PlayerPlane
+extends RigidBody3D
+## 双翼尖推进器飞机。
+## 机身持续受到沿机身"上"方向的主推力 up_force。
+## 每侧推进器在翼尖处沿机身"下"方向施力（Shift = 把这一侧往下压）：
+## - 单侧推进 → 力偏离质心产生扭矩 → 飞机翻滚（左压 → 左翼下沉 → 向左滚）
+## - 双侧推进 → 扭矩抵消 → 抵消一部分主推力，整体向机腹方向沉
+## 松开后，不倒翁回正力矩会把飞机慢慢扳回水平。
+## 飞机只在 XY 平面内运动、只绕 Z 轴翻滚（其余轴已在场景里锁定）。
+
+## 单个推进器的推力（牛）。两个一起 > 重力(mass*9.8) 才能上升。
+@export var thrust_force: float = 15
+## 推进器离机身中心线的距离（米），越大单侧推进时翻滚越猛。
+@export var thruster_offset: float = 2.5
+## 翻滚角速度上限（弧度/秒），防止转成陀螺。
+@export var max_roll_speed: float = 1.0
+
+@export var up_force: float = 17
+## 只按一侧时的推力倍率（加大马力）。两侧一起按时按 1 倍计算。
+@export var single_side_boost: float = 1.6
+## 自动回正强度（不倒翁）：回正力矩 = 翻滚角(弧度) × 该值。
+## 单侧推进器力矩 = thrust_force × thruster_offset（现在约 11.25），
+## 回正强度要小于它才能把飞机压到大角度；设为 0 关闭回正。
+@export var righting_strength: float = 4.0
+
+@onready var _flame_left: Node3D = $FlameLeft
+@onready var _flame_right: Node3D = $FlameRight
+
+
+## 按空格快速翻面：在一侧翼尖沿机身"下"方向施加的一次性冲量大小。
+## 越大翻得越快、越远；转多少度完全由物理（冲量、阻尼）决定。
+@export var flip_impulse: float = 5
+
+## 翻面状态：_flip_requested = 按了空格等物理帧处理；_flipping = 翻面中（不受 max_roll_speed 限制）。
+var _flip_requested: bool = false
+var _flipping: bool = false
+
+## 出生点（进入场景时的位置和姿态），按 R 回到这里。
+var _spawn_transform: Transform3D
+var _reset_requested: bool = false
+
+
+func _ready() -> void:
+	_spawn_transform = global_transform
+
+
+## 左右推进器的按键状态（不用 Input.is_action_pressed，原因见 _input）。
+var _left_held: bool = false
+var _right_held: bool = false
+
+
+func _input(event: InputEvent) -> void:
+	# Windows 长按会发 echo（连发）事件，偶尔有一个迟到、排在"松开"后面，会让推进器卡住。
+	# 但按住一侧再按另一侧时，第二侧的真实按下也会被 Windows 标成 echo。
+	# 所以规则是：两侧都没按着时来的 echo 一定是迟到的，丢掉；其余正常处理。
+	if event is InputEventKey and event.echo and not _left_held and not _right_held:
+		return
+	if event.is_action("shift_left"):
+		_left_held = event.is_pressed()
+	elif event.is_action("shift_right"):
+		_right_held = event.is_pressed()
+
+
+func _notification(what: int) -> void:
+	# 切出窗口时可能收不到松开事件，直接全部松开
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_left_held = false
+		_right_held = false
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("reset"):
+		_reset_requested = true
+	elif event.is_action_pressed("space") and not _flipping:
+		_flip_requested = true
+
+
+func _physics_process(_delta: float) -> void:
+	var left_on: bool = _left_held
+	var right_on: bool = _right_held
+
+	var down: Vector3 = -global_basis.y
+	var up: Vector3 = global_basis.y
+	var right_dir: Vector3 = global_basis.x
+	
+	if abs(rotation.z) < 2:
+		apply_force(up * up_force)
+	else:
+		apply_force(down * up_force)
+	
+	# 只按一侧时加大马力
+	var boost: float = single_side_boost if left_on != right_on else 1.0
+	var force: float = thrust_force * boost
+
+	if left_on:
+		apply_force(down * force, -right_dir * thruster_offset)
+	if right_on:
+		apply_force(down * force, right_dir * thruster_offset)
+
+	_flame_left.visible = left_on
+	_flame_right.visible = right_on
+	# 火焰跟着推力倍率变长，让玩家看得出在加大马力
+	_flame_left.scale = Vector3(1.0, boost, 1.0)
+	_flame_right.scale = Vector3(1.0, boost, 1.0)
+
+
+func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
+	# 刚体不能直接改 transform，要在物理回调里通过 state 重置
+	if _reset_requested:
+		_reset_requested = false
+		state.transform = _spawn_transform
+		state.linear_velocity = Vector3.ZERO
+		state.angular_velocity = Vector3.ZERO
+		_flipping = false
+		_flip_requested = false
+		return
+
+	# 快速翻面：在一侧翼尖往下打一个大冲量。
+	# 顺着当前翻滚方向：正在往左滚（+）就压左翼尖，往右滚（-）就压右翼尖；几乎没在转时默认压左翼尖。
+	if _flip_requested:
+		_flip_requested = false
+		_flipping = true
+		var basis_now: Basis = state.transform.basis
+		var side: float = -1.0 if state.angular_velocity.z >= -0.1 else 1.0  # -1 = 左翼尖，+1 = 右翼尖
+		state.apply_impulse(-basis_now.y * flip_impulse, basis_now.x * side * thruster_offset)
+
+	var av: Vector3 = state.angular_velocity
+	if _flipping:
+		# 翻面期间不限速，等阻尼把角速度降回正常范围后恢复限速
+		if absf(av.z) <= max_roll_speed:
+			_flipping = false
+		return
+
+	av.z = clampf(av.z, -max_roll_speed, max_roll_speed)
+	state.angular_velocity = av

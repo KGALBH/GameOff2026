@@ -1,0 +1,52 @@
+[gd_scene format=3 uid="uid://d2hubxynwvuqj"]
+
+[ext_resource type="Script" uid="uid://ll1gx0svbxop" path="res://Scripts/plane.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dvarouk2rd0nw" path="res://Resources/Model/飞机测试版.blend" id="2_model"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fuselage"]
+size = Vector3(0.9, 1.2, 5.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wing"]
+size = Vector3(5.4, 0.5, 1.45)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
+shading_mode = 0
+albedo_color = Color(1, 0.55, 0.1, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_flame"]
+material = SubResource("StandardMaterial3D_flame")
+top_radius = 0.25
+bottom_radius = 0.0
+height = 0.8
+radial_segments = 8
+rings = 1
+
+[node name="Plane" type="RigidBody3D" unique_id=1222946090]
+axis_lock_linear_z = true
+axis_lock_angular_x = true
+axis_lock_angular_y = true
+center_of_mass_mode = 1
+linear_damp = 0.4
+angular_damp = 3.0
+script = ExtResource("1_script")
+
+[node name="Model" parent="." unique_id=206908879 instance=ExtResource("2_model")]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0, 0, 0)
+
+[node name="FuselageShape" type="CollisionShape3D" parent="." unique_id=1513534901]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0.53)
+shape = SubResource("BoxShape3D_fuselage")
+
+[node name="WingShape" type="CollisionShape3D" parent="." unique_id=950906126]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
+shape = SubResource("BoxShape3D_wing")
+
+[node name="FlameLeft" type="MeshInstance3D" parent="." unique_id=47418584]
+transform = Transform3D(1, 0, 0, 0, -0.9982315, -0.059446465, 0, 0.059446465, -0.9982315, -2.5, 0.69191396, 0)
+visible = false
+mesh = SubResource("CylinderMesh_flame")
+
+[node name="FlameRight" type="MeshInstance3D" parent="." unique_id=1076755313]
+transform = Transform3D(1, 0, 0, 0, -0.99999815, 0.0019310383, 0, -0.0019310383, -0.99999815, 2.5, 0.6593703, 0)
+visible = false
+mesh = SubResource("CylinderMesh_flame")
