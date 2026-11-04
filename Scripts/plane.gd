@@ -34,14 +34,44 @@ extends RigidBody3D
 ## 翻面状态：_flip_requested = 按了空格等物理帧处理；_flipping = 翻面中（不受 max_roll_speed 限制）。
 var _flip_requested: bool = false
 var _flipping: bool = false
+## 翻面时是否把飞机定在原地（只转不动）。
+@export var hold_position_while_flipping: bool = true
+## 翻面开始时记下的位置，翻面期间一直钉在这里。
+var _flip_anchor: Vector3
 
 ## 出生点（进入场景时的位置和姿态），按 R 回到这里。
 var _spawn_transform: Transform3D
 var _reset_requested: bool = false
 
 
+## —— 俯仰表现（纯视觉，只转模型，不影响物理/碰撞）——
+## 上升时机头朝上、下降时机头朝下。
+## 每 1 米/秒 的升降速度对应多少度俯仰。
+@export var pitch_per_speed: float = 4.0
+## 最大俯仰角（度）。
+@export var max_pitch_deg: float = 25.0
+## 俯仰跟随速度，越大越灵敏、越小越柔和。
+@export var pitch_smoothing: float = 6.0
+
+@onready var _model: Node3D = $Model
+var _model_base: Transform3D
+var _pitch: float = 0.0
+
+
 func _ready() -> void:
 	_spawn_transform = global_transform
+	_model_base = _model.transform
+
+
+func _process(delta: float) -> void:
+	# 用沿机身"上"方向的速度：正着飞时就是世界里的上升/下降；
+	# 翻过来后也是机头朝运动方向偏，看起来更自然。
+	var climb_speed: float = linear_velocity.dot(global_basis.y)
+	var max_pitch: float = deg_to_rad(max_pitch_deg)
+	var target: float = clampf(climb_speed * deg_to_rad(pitch_per_speed), -max_pitch, max_pitch)
+	_pitch = lerpf(_pitch, target, 1.0 - exp(-pitch_smoothing * delta))
+	# 机头朝 -Z，绕机身 X 轴正转 = 抬头
+	_model.transform = Transform3D(Basis(Vector3.RIGHT, _pitch), Vector3.ZERO) * _model_base
 
 
 ## 左右推进器的按键状态（不用 Input.is_action_pressed，原因见 _input）。
@@ -82,11 +112,14 @@ func _physics_process(_delta: float) -> void:
 	var down: Vector3 = -global_basis.y
 	var up: Vector3 = global_basis.y
 	var right_dir: Vector3 = global_basis.x
-	
-	if abs(rotation.z) < 2:
-		apply_force(up * up_force)
-	else:
-		apply_force(down * up_force)
+
+	# 翻面定身期间不施加主推力（推进器的扭矩照常，火焰照常显示）
+	var frozen: bool = _flipping and hold_position_while_flipping
+	if not frozen:
+		if abs(rotation.z) < 2:
+			apply_force(up * up_force)
+		else:
+			apply_force(down * up_force)
 	
 	# 只按一侧时加大马力
 	var boost: float = single_side_boost if left_on != right_on else 1.0
@@ -120,12 +153,19 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if _flip_requested:
 		_flip_requested = false
 		_flipping = true
+		_flip_anchor = state.transform.origin
 		var basis_now: Basis = state.transform.basis
 		var side: float = -1.0 if state.angular_velocity.z >= -0.1 else 1.0  # -1 = 左翼尖，+1 = 右翼尖
 		state.apply_impulse(-basis_now.y * flip_impulse, basis_now.x * side * thruster_offset)
 
 	var av: Vector3 = state.angular_velocity
 	if _flipping:
+		# 定在原地：每个物理帧把位置钉回锚点、清掉线速度（重力和推力都不会让它移动）
+		if hold_position_while_flipping:
+			var t: Transform3D = state.transform
+			t.origin = _flip_anchor
+			state.transform = t
+			state.linear_velocity = Vector3.ZERO
 		# 翻面期间不限速，等阻尼把角速度降回正常范围后恢复限速
 		if absf(av.z) <= max_roll_speed:
 			_flipping = false

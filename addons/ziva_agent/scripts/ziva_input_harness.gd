@@ -48,6 +48,10 @@ const MAX_FRAME_EDGE := 1568
 # that a window that is not costs one op instead of the session's 120s deadline.
 const CAPTURE_DRAW_TIMEOUT_FRAMES := 60
 
+# How often a batch run rewrites its started marker; the editor's stall check
+# allows several of these.
+const HEARTBEAT_MS := 500
+
 # Nodes the purity digest walks before it stops. A bound, not a target: the digest
 # runs twice per probe, and a scene big enough to exceed this is one where a
 # partial digest still catches anything a probe does to the nodes it reached.
@@ -212,6 +216,10 @@ var _running_max_fps: int = -1
 var _params: Dictionary = {}
 var _start_ms: int = 0
 var _start_frame: int = 0
+var _beat_ms := 0
+var _beat_first_frame := 0
+var _beat_first_drawn := 0
+var _beat_last_drawn := 0
 # target -> Control, for the click-to-focus + text readback below.
 var _typed_targets: Dictionary = {}
 
@@ -297,14 +305,42 @@ func _ready() -> void:
 	_params = _load_params()
 	if _params.is_empty():
 		return
-	# Marker the editor polls: it separates "the game never booted this far" (a
-	# startup failure, e.g. a script that fails to instantiate) from "the game is
-	# running but never rendered a frame". Without it both look identical. (#1129)
-	var marker := FileAccess.open(String(_params["started_path"]), FileAccess.WRITE)
-	if marker != null:
-		marker.store_string("1")
-		marker.close()
+	# Marker the editor polls: its absence means startup never got past the
+	# project's own autoloads or the scene load. (#1129)
+	_beat_first_frame = Engine.get_process_frames()
+	_beat_first_drawn = Engine.get_frames_drawn()
+	_beat_last_drawn = _beat_first_drawn
+	_beat()
+	get_tree().process_frame.connect(_on_beat_frame)
 	_run.call_deferred()
+
+
+# The marker doubles as a heartbeat, so a timed-out run can tell a game whose
+# main loop stopped (stale marker) from one that runs but draws nothing.
+# Fixed-width fields rewritten in place mean a concurrent read never sees it empty.
+func _beat() -> void:
+	_beat_ms = Time.get_ticks_msec()
+	var path := String(_params["started_path"])
+	var marker := FileAccess.open(path, FileAccess.READ_WRITE)
+	if marker == null:
+		marker = FileAccess.open(path, FileAccess.WRITE)
+	if marker == null:
+		return
+	var drawn := Engine.get_frames_drawn()
+	marker.store_string(
+		"%010d %010d %010d" % [
+			Engine.get_process_frames() - _beat_first_frame,
+			drawn - _beat_first_drawn,
+			drawn - _beat_last_drawn,
+		]
+	)
+	marker.close()
+	_beat_last_drawn = drawn
+
+
+func _on_beat_frame() -> void:
+	if Time.get_ticks_msec() - _beat_ms >= HEARTBEAT_MS:
+		_beat()
 
 
 func _on_capture(message: String, data: Array) -> bool:
