@@ -1,0 +1,30 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Scripts/bullet.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_bullet"]
+shading_mode = 0
+albedo_color = Color(1, 0.9, 0.3, 1)
+
+[sub_resource type="CapsuleMesh" id="Mesh_bullet"]
+material = SubResource("Mat_bullet")
+radius = 0.08
+height = 0.8
+radial_segments = 8
+rings = 2
+
+[sub_resource type="CapsuleShape3D" id="Shape_bullet"]
+radius = 0.1
+height = 0.8
+
+[node name="Bullet" type="Area3D"]
+monitorable = false
+script = ExtResource("1_script")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+mesh = SubResource("Mesh_bullet")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+shape = SubResource("Shape_bullet")

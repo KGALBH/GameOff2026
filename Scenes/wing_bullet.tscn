@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Scripts/bullet.gd" id="1_script"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_wing_bullet"]
+shading_mode = 0
+albedo_color = Color(0.3, 0.85, 1, 1)
+
+[sub_resource type="SphereMesh" id="Mesh_wing_bullet"]
+material = SubResource("Mat_wing_bullet")
+radius = 0.18
+height = 0.36
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereShape3D" id="Shape_wing_bullet"]
+radius = 0.2
+
+[node name="WingBullet" type="Area3D"]
+monitorable = false
+script = ExtResource("1_script")
+speed = 40.0
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("Mesh_wing_bullet")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+shape = SubResource("Shape_wing_bullet")

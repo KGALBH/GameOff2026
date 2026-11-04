@@ -53,6 +53,33 @@ var _reset_requested: bool = false
 ## 俯仰跟随速度，越大越灵敏、越小越柔和。
 @export var pitch_smoothing: float = 6.0
 
+## —— 自动射击：机头炮 ——
+## 机头炮是否自动开火。
+@export var auto_fire: bool = true
+## 机头炮子弹场景。
+@export var head_bullet_scene: PackedScene = preload("res://Scenes/bullet.tscn")
+## 机头炮两发间隔（秒）。
+@export var fire_interval: float = 0.05
+## 机头枪口位置（相对机身，机头朝 -Z）。
+@export var muzzle_offset: Vector3 = Vector3(0, 0, -2.8)
+var _fire_timer: float = 0.0
+
+## —— 自动射击：翼尖炮（左右机翼各一门，同时开火）——
+## 翼尖炮是否自动开火。
+@export var wing_auto_fire: bool = true
+## 翼尖炮子弹场景。
+@export var wing_bullet_scene: PackedScene = preload("res://Scenes/wing_bullet.tscn")
+## 翼尖炮两发间隔（秒） 。
+@export var wing_fire_interval: float = 0.20
+## 右翼尖枪口位置（左翼自动取 X 镜像）。
+@export var wing_muzzle_offset: Vector3 = Vector3(2.5, 0, -0.8)
+var _wing_fire_timer: float = 0.0
+
+## 翻面时翼尖弹额外获得的向外速度（沿机翼方向，米/秒）。0 = 关闭。
+@export var flip_spread_speed: float = 20.0
+## 翻面时翼尖炮的射速倍率（2 = 射速翻倍）。
+@export var flip_fire_rate_multiplier: float = 5.0
+
 @onready var _model: Node3D = $Model
 var _model_base: Transform3D
 var _pitch: float = 0.0
@@ -73,7 +100,37 @@ func _process(delta: float) -> void:
 	# 机头朝 -Z，绕机身 X 轴正转 = 抬头
 	_model.transform = Transform3D(Basis(Vector3.RIGHT, _pitch), Vector3.ZERO) * _model_base
 
+	if auto_fire and head_bullet_scene:
+		_fire_timer -= delta
+		if _fire_timer <= 0.0:
+			_fire_timer += fire_interval
+			_spawn_bullet(head_bullet_scene, muzzle_offset)
 
+	if wing_auto_fire and wing_bullet_scene:
+		# 翻面时射速加快
+		var interval: float = wing_fire_interval
+		if _flipping:
+			interval /= maxf(flip_fire_rate_multiplier, 0.01)
+		# 刚开始翻面时不用等完普通间隔，立刻进入快速射击
+		_wing_fire_timer = minf(_wing_fire_timer, interval) - delta
+		if _wing_fire_timer <= 0.0:
+			_wing_fire_timer += interval
+			# 翻面时给翼尖弹加一点向外（沿机翼）的速度
+			var spread: float = flip_spread_speed if _flipping else 0.0
+			_spawn_bullet(wing_bullet_scene, wing_muzzle_offset, global_basis.x * spread)
+			_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1), -global_basis.x * spread)
+
+
+## 在机身局部坐标 local_offset 处，沿机身前方（不含俯仰表现）发射一颗子弹，
+## extra_velocity 会叠加到子弹的飞行速度上。
+func _spawn_bullet(scene: PackedScene, local_offset: Vector3, extra_velocity: Vector3 = Vector3.ZERO) -> void:
+	var bullet: Bullet = scene.instantiate() as Bullet
+	bullet.shooter = self
+	get_tree().current_scene.add_child(bullet)
+	bullet.global_transform = Transform3D(global_basis.orthonormalized(), global_transform * local_offset)
+	bullet.velocity = -bullet.global_basis.z * bullet.speed + extra_velocity
+
+ 
 ## 左右推进器的按键状态（不用 Input.is_action_pressed，原因见 _input）。
 var _left_held: bool = false
 var _right_held: bool = false
@@ -147,7 +204,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		_flipping = false
 		_flip_requested = false
 		return
-
+ 
 	# 快速翻面：在一侧翼尖往下打一个大冲量。
 	# 顺着当前翻滚方向：正在往左滚（+）就压左翼尖，往右滚（-）就压右翼尖；几乎没在转时默认压左翼尖。
 	if _flip_requested:
