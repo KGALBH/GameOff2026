@@ -85,6 +85,11 @@ var _model_base: Transform3D
 var _pitch: float = 0.0
 
 
+## 受到伤害（敌机碰撞等调用）。现在只发信号，血量以后再做。
+func take_hit(source: Node) -> void:
+	SignalBus.player_hit.emit(source)
+
+
 func _ready() -> void:
 	_spawn_transform = global_transform
 	_model_base = _model.transform
@@ -227,6 +232,6 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		if absf(av.z) <= max_roll_speed:
 			_flipping = false
 		return
-
+   
 	av.z = clampf(av.z, -max_roll_speed, max_roll_speed)
 	state.angular_velocity = av
