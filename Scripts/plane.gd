@@ -15,7 +15,7 @@ extends RigidBody3D
 ## 翻滚角速度上限（弧度/秒），防止转成陀螺。
 @export var max_roll_speed: float = 1.0
 
-@export var up_force: float = 17
+@export var up_force: float = 10
 ## 只按一侧时的推力倍率（加大马力）。两侧一起按时按 1 倍计算。
 @export var single_side_boost: float = 1.6
 ## 自动回正强度（不倒翁）：回正力矩 = 翻滚角(弧度) × 该值。
@@ -75,7 +75,7 @@ var _fire_timer: float = 0.0
 @export var wing_muzzle_offset: Vector3 = Vector3(2.5, 0, -0.8)
 var _wing_fire_timer: float = 0.0
 
-## 翻面时翼尖弹额外获得的向外速度（沿机翼方向，米/秒）。0 = 关闭。
+## 翻面时翼尖弹的飞行速度（沿机翼向外，米/秒；翻面时不带向前的速度）。
 @export var flip_spread_speed: float = 20.0
 ## 翻面时翼尖炮的射速倍率（2 = 射速翻倍）。
 @export var flip_fire_rate_multiplier: float = 5.0
@@ -120,20 +120,24 @@ func _process(delta: float) -> void:
 		_wing_fire_timer = minf(_wing_fire_timer, interval) - delta
 		if _wing_fire_timer <= 0.0:
 			_wing_fire_timer += interval
-			# 翻面时给翼尖弹加一点向外（沿机翼）的速度
-			var spread: float = flip_spread_speed if _flipping else 0.0
-			_spawn_bullet(wing_bullet_scene, wing_muzzle_offset, global_basis.x * spread)
-			_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1), -global_basis.x * spread)
+			if _flipping:
+				# 翻面时：取消向前的速度，只沿机翼向外射。机身在转，所以子弹会洒向四周一圈
+				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset, global_basis.x * flip_spread_speed, false)
+				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1), -global_basis.x * flip_spread_speed, false)
+			else:
+				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset)
+				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1))
 
 
 ## 在机身局部坐标 local_offset 处，沿机身前方（不含俯仰表现）发射一颗子弹，
-## extra_velocity 会叠加到子弹的飞行速度上。
-func _spawn_bullet(scene: PackedScene, local_offset: Vector3, extra_velocity: Vector3 = Vector3.ZERO) -> void:
+## extra_velocity 会叠加到子弹的飞行速度上；forward = false 时不带向前的速度，只用 extra_velocity。
+func _spawn_bullet(scene: PackedScene, local_offset: Vector3, extra_velocity: Vector3 = Vector3.ZERO, forward: bool = true) -> void:
 	var bullet: Bullet = scene.instantiate() as Bullet
 	bullet.shooter = self
 	get_tree().current_scene.add_child(bullet)
 	bullet.global_transform = Transform3D(global_basis.orthonormalized(), global_transform * local_offset)
-	bullet.velocity = -bullet.global_basis.z * bullet.speed + extra_velocity
+	var forward_velocity: Vector3 = -bullet.global_basis.z * bullet.speed if forward else Vector3.ZERO
+	bullet.velocity = forward_velocity + extra_velocity
 
  
 ## 左右推进器的按键状态（不用 Input.is_action_pressed，原因见 _input）。
@@ -175,9 +179,10 @@ func _physics_process(_delta: float) -> void:
 	var up: Vector3 = global_basis.y
 	var right_dir: Vector3 = global_basis.x
 
-	# 翻面定身期间不施加主推力（推进器的扭矩照常，火焰照常显示）
+	# 翻面定身期间、或只按住一侧 Shift 时，不施加主推力（上升的力）；两侧同时按住时照常施加
 	var frozen: bool = _flipping and hold_position_while_flipping
-	if not frozen:
+	var single_side: bool = left_on != right_on
+	if not frozen and not single_side:
 		if abs(rotation.z) < 2:
 			apply_force(up * up_force)
 		else:
