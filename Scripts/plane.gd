@@ -15,7 +15,7 @@ extends RigidBody3D
 ## 翻滚角速度上限（弧度/秒），防止转成陀螺。
 @export var max_roll_speed: float = 1.0
 
-@export var up_force: float = 10
+@export var up_force: float = 17
 ## 只按一侧时的推力倍率（加大马力）。两侧一起按时按 1 倍计算。
 @export var single_side_boost: float = 1.6
 ## 自动回正强度（不倒翁）：回正力矩 = 翻滚角(弧度) × 该值。
@@ -143,18 +143,58 @@ func _spawn_bullet(scene: PackedScene, local_offset: Vector3, extra_velocity: Ve
 ## 左右推进器的按键状态（不用 Input.is_action_pressed，原因见 _input）。
 var _left_held: bool = false
 var _right_held: bool = false
+## 每侧最近一次"松开"的时间（毫秒），用来识别松开后迟到的 echo。
+var _left_released_ms: int = -100000
+var _right_released_ms: int = -100000
+## 松开后多少毫秒内来的 echo 视为迟到的连发，丢掉。
+const LATE_ECHO_MS = 150
 
 
 func _input(event: InputEvent) -> void:
-	# Windows 长按会发 echo（连发）事件，偶尔有一个迟到、排在"松开"后面，会让推进器卡住。
-	# 但按住一侧再按另一侧时，第二侧的真实按下也会被 Windows 标成 echo。
-	# 所以规则是：两侧都没按着时来的 echo 一定是迟到的，丢掉；其余正常处理。
-	if event is InputEventKey and event.echo and not _left_held and not _right_held:
+	# 兜底：任何带修饰键信息的事件（鼠标移动、其他按键…）都会如实报告系统里 Shift 是否按着。
+	# 如果系统说"没有 Shift"，而我们还以为按着，说明漏掉了松开事件 → 强制松开，火焰不会卡住。
+	if event is InputEventWithModifiers and not (event as InputEventWithModifiers).shift_pressed:
+		var is_shift_press: bool = event is InputEventKey and (event as InputEventKey).pressed \
+				and (event.is_action("shift_left") or event.is_action("shift_right"))
+		if not is_shift_press:
+			_left_held = false
+			_right_held = false
+	if not (event is InputEventKey):
 		return
-	if event.is_action("shift_left"):
-		_left_held = event.is_pressed()
-	elif event.is_action("shift_right"):
-		_right_held = event.is_pressed()
+	var key: InputEventKey = event as InputEventKey
+	var is_left: bool = key.is_action("shift_left")
+	var is_right: bool = key.is_action("shift_right")
+	if not is_left and not is_right:
+		return
+
+	if key.pressed:
+		if key.echo:
+			# Windows 的两个坑：
+			# 1. 长按时的 echo 偶尔迟到，排在"松开"后面 → 刚松开就来的 echo 要丢掉，否则推进器卡住。
+			# 2. 按住一侧 Shift 再按另一侧，第二侧的真实按下会被标成 echo → 不能一律丢掉 echo。
+			var released_ms: int = _left_released_ms if is_left else _right_released_ms
+			if Time.get_ticks_msec() - released_ms < LATE_ECHO_MS:
+				return
+		if is_left:
+			_left_held = true
+		else:
+			_right_held = true
+	else:
+		var now: int = Time.get_ticks_msec()
+		if is_left:
+			_left_held = false
+			_left_released_ms = now
+		else:
+			_right_held = false
+			_right_released_ms = now
+		# 坑 3：两个 Shift 同时按着时先松开一个，Windows 经常不发它的松开事件，
+		# 最后只收到一次松开。所以松开时如果系统已经没有任何 Shift 按着，就两侧一起松开。
+		if not key.shift_pressed:
+			_left_held = false
+			_right_held = false
+			_left_released_ms = now
+			_right_released_ms = now
+
 
 
 func _notification(what: int) -> void:
@@ -179,14 +219,8 @@ func _physics_process(_delta: float) -> void:
 	var up: Vector3 = global_basis.y
 	var right_dir: Vector3 = global_basis.x
 
-	# 翻面定身期间、或只按住一侧 Shift 时，不施加主推力（上升的力）；两侧同时按住时照常施加
-	var frozen: bool = _flipping and hold_position_while_flipping
-	var single_side: bool = left_on != right_on
-	if not frozen and not single_side:
-		if abs(rotation.z) < 2:
-			apply_force(up * up_force)
-		else:
-			apply_force(down * up_force)
+	apply_force(up * up_force)
+
 	
 	# 只按一侧时加大马力
 	var boost: float = single_side_boost if left_on != right_on else 1.0
