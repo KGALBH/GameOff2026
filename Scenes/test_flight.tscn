@@ -25,7 +25,7 @@ transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.6
 shadow_enabled = true
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=128248063]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 24)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 30.160519)
 fov = 50.0
 
 [node name="Plane" parent="." unique_id=1098521234 instance=ExtResource("1_plane")]

@@ -81,6 +81,16 @@ func spawn() -> void:
 		# 加到编队的父节点下，这样编队节点本身被删也不影响已出发的敌机
 		get_parent().add_child(enemy)
 
+	# 横着飞的编队：先沿轨迹显示攻击预警（敌机的出发时间已经在 FormationData 里延后了）
+	var paths: Array[PackedVector3Array] = data.lateral_warning_paths(global_position)
+	if not paths.is_empty():
+		var telegraph: PathTelegraph = PathTelegraph.new()
+		telegraph.name = "%s_Telegraph" % name
+		get_parent().add_child(telegraph)
+		telegraph.setup(paths, data.warning_time, data.warning_width)
+		telegraph.start_delay = data.warning_start_time(global_position)
+		telegraph.visible = telegraph.start_delay <= 0.0
+
 
 func _on_enemy_removed(was_killed: bool) -> void:
 	gone += 1

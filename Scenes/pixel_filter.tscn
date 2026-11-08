@@ -4,7 +4,7 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_pixel"]
 shader = ExtResource("1_shader")
-shader_parameter/pixel_size = 5.0
+shader_parameter/pixel_size = 3.0
 shader_parameter/quantize_colors = true
 shader_parameter/color_levels = 16.0
 

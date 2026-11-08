@@ -36,10 +36,31 @@ const Pattern = EnemyPath.Pattern
 @export var hp: int = 3
 ## 存活上限（秒），超时自动销毁，防止飞出画面后一直残留。
 @export var max_lifetime: float = 40.0
-## 飞过镜头（世界 Z 超过这个值）后自动销毁。
-@export var despawn_z: float = 26.0
+## 朝屏幕飞来的敌机，飞过玩家所在平面（世界 Z 超过这个值）后立刻销毁。
+## 只对朝 +Z 飞的敌机生效，在 z = 0 平面里横飞的敌机不受影响。
+@export var despawn_z: float = 3.0
 ## 横向/纵向飞出这个范围（世界 |X| 或 |Y|）后自动销毁。
 @export var despawn_xy: float = 40.0
+
+@export_group("可读性")
+## 显示落点标记：在玩家所在平面（z = 0）上画一个圈，标出这架敌机将会穿过的位置。
+@export var show_landing_marker: bool = true
+## 到达前多少秒开始显示落点圈。
+@export var marker_lead_time: float = 2.0
+## 落点圈刚出现时的放大倍数（到达时缩到 1 倍 = 碰撞大小）。
+@export var marker_start_scale: float = 3.0
+## 落点圈颜色（透明度会随接近程度变化）。
+@export var marker_color: Color = Color(1.0, 0.35, 0.2)
+## 按距离变色：越远越偏向 tint_color（像雾一样发灰发蓝），越近越接近原色。
+@export var distance_tint: bool = true
+## 距玩家平面多近开始完全是原色（米）。
+@export var tint_near: float = 15.0
+## 距玩家平面多远达到最大染色（米）。
+@export var tint_far: float = 120.0
+## 远处的颜色。
+@export var tint_color: Color = Color(0.45, 0.55, 0.75)
+## 最远处染色的强度（0~1）。
+@export_range(0.0, 1.0) var tint_max: float = 0.8
 
 ## 出发前的等待时间（秒），编队用它做"一架接一架"的效果。
 var start_delay: float = 0.0
@@ -53,6 +74,13 @@ var _time: float = 0.0
 var _side: Vector3
 var _up: Vector3
 var _removed: bool = false
+
+## 落点：穿过 z = 0 的时刻（飞行时间，<0 表示不会穿过）和位置。
+var _cross_time: float = -1.0
+var _cross_pos: Vector3
+var _marker: MeshInstance3D
+var _marker_mat: StandardMaterial3D
+var _tint_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -71,6 +99,7 @@ func _ready() -> void:
 	if start_delay > 0.0:
 		_set_active(false)
 	_update_transform(0.0)
+	_setup_readability()
 
 
 ## 等待出发时隐藏，且既不撞玩家、也不会被子弹打到。
@@ -89,9 +118,11 @@ func _physics_process(delta: float) -> void:
 
 	_time += delta
 	_update_transform(delta)
+	_update_readability()
 
 	var p: Vector3 = global_position
-	if _time >= max_lifetime or p.z > despawn_z or absf(p.x) > despawn_xy or absf(p.y) > despawn_xy:
+	var passed_player: bool = direction.z > 0.01 and p.z > despawn_z
+	if _time >= max_lifetime or passed_player or absf(p.x) > despawn_xy or absf(p.y) > despawn_xy:
 		_remove(false)
 
 
@@ -108,6 +139,100 @@ func _update_transform(delta: float) -> void:
 
 func _offset_at(t: float) -> Vector3:
 	return EnemyPath.wobble(pattern, amplitude, frequency, phase, t, _side, _up)
+
+
+## 飞行 t 秒时的位置（和 _update_transform 用同一个公式）。
+func _path_pos(t: float) -> Vector3:
+	return _origin + direction * speed * t + _offset_at(t)
+
+
+# ———————————— 可读性：落点标记 + 距离染色 ————————————
+
+func _setup_readability() -> void:
+	if show_landing_marker:
+		_cross_time = _solve_cross_time()
+		if _cross_time > 0.0:
+			_cross_pos = _path_pos(_cross_time)
+			_cross_pos.z = 0.0
+			_marker = _create_marker()
+			add_child(_marker)
+			_marker.visible = false
+
+	if distance_tint:
+		# 用 material_overlay 叠一层半透明的颜色，换了 model_scene 也能用
+		_tint_mat = StandardMaterial3D.new()
+		_tint_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_tint_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		for node: Node in $Model.find_children("*", "MeshInstance3D", true, false):
+			if not node.is_queued_for_deletion():
+				(node as MeshInstance3D).material_overlay = _tint_mat
+		_update_tint()
+
+
+## 计算穿过 z = 0 的飞行时间。不朝玩家方向飞（比如横着飞）返回 -1。
+func _solve_cross_time() -> float:
+	var vz: float = direction.z * speed
+	if vz < 0.5 or _origin.z >= 0.0:
+		return -1.0
+	# 先按直线估算，再用牛顿法修正摆动带来的 z 偏差
+	var t: float = -_origin.z / vz
+	for i: int in 4:
+		t -= _path_pos(t).z / vz
+	return t
+
+
+func _create_marker() -> MeshInstance3D:
+	var ring: TorusMesh = TorusMesh.new()
+	var radius: float = 0.85
+	var shape: CollisionShape3D = get_node_or_null(^"Shape") as CollisionShape3D
+	if shape and shape.shape is SphereShape3D:
+		radius = (shape.shape as SphereShape3D).radius
+	ring.inner_radius = radius * 0.8
+	ring.outer_radius = radius
+	ring.rings = 24
+	ring.ring_segments = 6
+
+	_marker_mat = StandardMaterial3D.new()
+	_marker_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_marker_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_marker_mat.no_depth_test = true
+	_marker_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_marker_mat.render_priority = 10
+
+	var mi: MeshInstance3D = MeshInstance3D.new()
+	mi.name = "LandingMarker"
+	mi.mesh = ring
+	mi.material_override = _marker_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.top_level = true  # 不跟着敌机移动、旋转
+	return mi
+
+
+func _update_readability() -> void:
+	if _marker:
+		var time_left: float = _cross_time - _time
+		if time_left > marker_lead_time or time_left < 0.0:
+			_marker.visible = false
+		else:
+			# k：0 = 刚出现，1 = 正在穿过
+			var k: float = 1.0 - time_left / maxf(marker_lead_time, 0.01)
+			var s: float = lerpf(marker_start_scale, 1.0, k)
+			# 圆环默认躺在 XZ 平面，转 90° 立起来，正对镜头
+			_marker.global_transform = Transform3D(Basis(Vector3.RIGHT, PI * 0.5).scaled(Vector3.ONE * s), _cross_pos)
+			var c: Color = marker_color
+			c.a = lerpf(0.15, 0.9, k)
+			_marker_mat.albedo_color = c
+			_marker.visible = true
+	if _tint_mat:
+		_update_tint()
+
+
+func _update_tint() -> void:
+	var dist: float = -global_position.z
+	var f: float = clampf((dist - tint_near) / maxf(tint_far - tint_near, 0.01), 0.0, 1.0)
+	var c: Color = tint_color
+	c.a = f * tint_max
+	_tint_mat.albedo_color = c
 
 
 ## 被子弹击中。
