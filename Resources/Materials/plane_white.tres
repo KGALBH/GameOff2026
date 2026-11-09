@@ -1,10 +1,11 @@
-[gd_resource type="ShaderMaterial" format=3]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://pjnovefjvgfh"]
 
-[ext_resource type="Shader" path="res://Shaders/toon_ramp.gdshader" id="1_shader"]
+[ext_resource type="Shader" uid="uid://o1c1miw0erqe" path="res://Shaders/toon_ramp.gdshader" id="1_shader"]
 
 [resource]
 resource_name = "Material.002"
+render_priority = 0
 shader = ExtResource("1_shader")
-shader_parameter/lit_color = Color(0.95, 0.95, 0.95, 1)
+shader_parameter/lit_color = Color(0, 0, 0, 1)
 shader_parameter/shadow_color = Color(0, 0, 0, 1)
 shader_parameter/threshold = 0.15
