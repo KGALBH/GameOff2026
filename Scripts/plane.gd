@@ -23,9 +23,6 @@ extends RigidBody3D
 ## 回正强度要小于它才能把飞机压到大角度；设为 0 关闭回正。
 @export var righting_strength: float = 4.0
 
-@onready var _flame_left: Node3D = $FlameLeft
-@onready var _flame_right: Node3D = $FlameRight
-
 
 ## 按空格快速翻面：在一侧翼尖沿机身"下"方向施加的一次性冲量大小。
 ## 越大翻得越快、越远；转多少度完全由物理（冲量、阻尼）决定。
@@ -152,7 +149,7 @@ const LATE_ECHO_MS = 150
 
 func _input(event: InputEvent) -> void:
 	# 兜底：任何带修饰键信息的事件（鼠标移动、其他按键…）都会如实报告系统里 Shift 是否按着。
-	# 如果系统说"没有 Shift"，而我们还以为按着，说明漏掉了松开事件 → 强制松开，火焰不会卡住。
+	# 如果系统说"没有 Shift"，而我们还以为按着，说明漏掉了松开事件 → 强制松开，推进器不会卡住。
 	if event is InputEventWithModifiers and not (event as InputEventWithModifiers).shift_pressed:
 		var is_shift_press: bool = event is InputEventKey and (event as InputEventKey).pressed \
 				and (event.is_action("shift_left") or event.is_action("shift_right"))
@@ -230,12 +227,6 @@ func _physics_process(_delta: float) -> void:
 		apply_force(down * force, -right_dir * thruster_offset)
 	if right_on:
 		apply_force(down * force, right_dir * thruster_offset)
-
-	_flame_left.visible = left_on
-	_flame_right.visible = right_on
-	# 火焰跟着推力倍率变长，让玩家看得出在加大马力
-	_flame_left.scale = Vector3(1.0, boost, 1.0)
-	_flame_right.scale = Vector3(1.0, boost, 1.0)
 
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:

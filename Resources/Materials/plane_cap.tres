@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://bijqdlw7e50ac"]
+
+[ext_resource type="Shader" uid="uid://o1c1miw0erqe" path="res://Shaders/toon_ramp.gdshader" id="1_shader"]
+
+[resource]
+resource_name = "盖盖"
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/lit_color = Color(1.4439225e-06, 0.43533432, 0.6527492, 1)
+shader_parameter/shadow_color = Color(0, 0, 0, 1)
+shader_parameter/threshold = 0.15
