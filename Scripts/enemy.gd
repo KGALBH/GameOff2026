@@ -38,7 +38,7 @@ const Pattern = EnemyPath.Pattern
 @export var max_lifetime: float = 40.0
 ## 朝屏幕飞来的敌机，飞过玩家所在平面（世界 Z 超过这个值）后立刻销毁。
 ## 只对朝 +Z 飞的敌机生效，在 z = 0 平面里横飞的敌机不受影响。
-@export var despawn_z: float = 3.0
+@export var despawn_z: float = 100.0
 ## 横向/纵向飞出这个范围（世界 |X| 或 |Y|）后自动销毁。
 @export var despawn_xy: float = 40.0
 

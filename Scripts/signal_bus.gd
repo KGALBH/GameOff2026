@@ -8,6 +8,12 @@ extends Node
 # —— 玩家 ——
 ## 玩家受到伤害（被敌机撞到等）。source = 造成伤害的物体。血量系统接这个。
 signal player_hit(source: Node)
+## 玩家飞出画面（开始倒计时）。
+signal player_left_screen
+## 玩家在倒计时结束前回到画面。
+signal player_returned_screen
+## 玩家失败。reason：失败原因，比如 "out_of_screen"（离开画面太久）。
+signal player_failed(reason: String)
 
 # —— 敌机 ——
 ## 敌机撞到了玩家。
