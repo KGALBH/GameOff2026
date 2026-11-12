@@ -1,0 +1,44 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/plane.tscn" id="1_plane"]
+[ext_resource type="PackedScene" path="res://Scenes/enemy.tscn" id="2_enemy"]
+
+[node name="AimTest" type="Node3D"]
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 0, 10, 0)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 30)
+fov = 50.0
+
+[node name="Plane" parent="." instance=ExtResource("1_plane")]
+freeze = true
+
+[node name="InBoxNear" parent="." instance=ExtResource("2_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 3, -40)
+speed = 0.0
+pattern = 0
+hp = 5.0
+show_landing_marker = false
+
+[node name="InBoxFar" parent="." instance=ExtResource("2_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 14, -70)
+speed = 0.0
+pattern = 0
+hp = 5.0
+show_landing_marker = false
+
+[node name="OutOfBox" parent="." instance=ExtResource("2_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -20, -40)
+speed = 0.0
+pattern = 0
+hp = 1000.0
+show_landing_marker = false
+
+[node name="TooDeep" parent="." instance=ExtResource("2_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, -120)
+speed = 0.0
+pattern = 0
+hp = 1000.0
+show_landing_marker = false

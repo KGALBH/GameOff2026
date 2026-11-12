@@ -33,7 +33,7 @@ const Pattern = EnemyPath.Pattern
 
 @export_group("战斗")
 ## 生命值（被几发子弹打中才爆）。
-@export var hp: int = 3
+@export var hp: float = 3.0
 ## 存活上限（秒），超时自动销毁，防止飞出画面后一直残留。
 @export var max_lifetime: float = 40.0
 ## 朝屏幕飞来的敌机，飞过玩家所在平面（世界 Z 超过这个值）后立刻销毁。
@@ -85,6 +85,7 @@ var _tint_mat: StandardMaterial3D
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+	add_to_group(&"enemies")  # 瞄准框靠这个组找目标
 	if model_scene:
 		for child: Node in $Model.get_children():
 			child.queue_free()
@@ -236,7 +237,7 @@ func _update_tint() -> void:
 
 
 ## 被子弹击中。
-func take_damage(amount: int) -> void:
+func take_damage(amount: float) -> void:
 	if _removed:
 		return
 	hp -= amount

@@ -77,9 +77,17 @@ var _wing_fire_timer: float = 0.0
 ## 翻面时翼尖炮的射速倍率（2 = 射速翻倍）。
 @export var flip_fire_rate_multiplier: float = 5.0
 
+## 自动瞄准框（子节点 AimReticle）。框里锁定到敌机才开火；没有这个节点时按老规则一直开火。
+@onready var _aim: AimReticle = get_node_or_null(^"AimReticle") as AimReticle
+
 @onready var _model: Node3D = $Model
 var _model_base: Transform3D
 var _pitch: float = 0.0
+
+
+## 当前按着哪侧推进器：x = 左（0/1），y = 右（0/1）。瞄准框用它决定往哪推。
+func manual_thrust_sides() -> Vector2i:
+	return Vector2i(int(_left_held), int(_right_held))
 
 
 ## 受到伤害（敌机碰撞等调用）。现在只发信号，血量以后再做。
@@ -102,9 +110,12 @@ func _process(delta: float) -> void:
 	# 机头朝 -Z，绕机身 X 轴正转 = 抬头
 	_model.transform = Transform3D(Basis(Vector3.RIGHT, _pitch), Vector3.ZERO) * _model_base
 
+	# 有瞄准框时：框里锁定到敌机才开火
+	var has_target: bool = _aim == null or is_instance_valid(_aim.target)
+
 	if auto_fire and head_bullet_scene:
-		_fire_timer -= delta
-		if _fire_timer <= 0.0:
+		_fire_timer = maxf(_fire_timer - delta, 0.0)
+		if _fire_timer <= 0.0 and !_flipping and has_target:
 			_fire_timer += fire_interval
 			_spawn_bullet(head_bullet_scene, muzzle_offset)
 
@@ -121,13 +132,17 @@ func _process(delta: float) -> void:
 				# 翻面时：取消向前的速度，只沿机翼向外射。机身在转，所以子弹会洒向四周一圈
 				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset, global_basis.x * flip_spread_speed, false)
 				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1), -global_basis.x * flip_spread_speed, false)
-			else:
+			elif has_target:
 				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset)
 				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1))
+			else:
+				# 没目标时不射，计时器停在 0，一锁定就立刻开火
+				_wing_fire_timer = 0.0
 
 
 ## 在机身局部坐标 local_offset 处，沿机身前方（不含俯仰表现）发射一颗子弹，
 ## extra_velocity 会叠加到子弹的飞行速度上；forward = false 时不带向前的速度，只用 extra_velocity。
+## 往前射的子弹会追踪瞄准框锁定的目标。
 func _spawn_bullet(scene: PackedScene, local_offset: Vector3, extra_velocity: Vector3 = Vector3.ZERO, forward: bool = true) -> void:
 	var bullet: Bullet = scene.instantiate() as Bullet
 	bullet.shooter = self
@@ -135,6 +150,10 @@ func _spawn_bullet(scene: PackedScene, local_offset: Vector3, extra_velocity: Ve
 	bullet.global_transform = Transform3D(global_basis.orthonormalized(), global_transform * local_offset)
 	var forward_velocity: Vector3 = -bullet.global_basis.z * bullet.speed if forward else Vector3.ZERO
 	bullet.velocity = forward_velocity + extra_velocity
+	# 普通往前射的子弹：追踪瞄准框锁定的敌机，伤害乘上距离倍率
+	if forward and _aim and is_instance_valid(_aim.target):
+		bullet.target = _aim.target
+		bullet.damage *= _aim.damage_multiplier
 
  
 ## 左右推进器的按键状态（不用 Input.is_action_pressed，原因见 _input）。
@@ -156,6 +175,13 @@ func _input(event: InputEvent) -> void:
 		if not is_shift_press:
 			_left_held = false
 			_right_held = false
+	# 代码/测试里直接触发的动作（Input.action_press 等）没有 Windows 的那些坑，直接用
+	if event is InputEventAction:
+		if event.is_action("shift_left"):
+			_left_held = event.is_pressed()
+		elif event.is_action("shift_right"):
+			_right_held = event.is_pressed()
+		return
 	if not (event is InputEventKey):
 		return
 	var key: InputEventKey = event as InputEventKey

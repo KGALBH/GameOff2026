@@ -6,6 +6,7 @@
 [ext_resource type="Material" path="res://Resources/Materials/plane_cap.tres" id="4_cap"]
 [ext_resource type="Material" path="res://Resources/Materials/plane_propeller.tres" id="5_prop"]
 [ext_resource type="Material" path="res://Resources/Materials/plane_white.tres" id="6_white"]
+[ext_resource type="Script" uid="uid://bci4yvnstbj0y" path="res://Scripts/aim_reticle.gd" id="7_aim"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_fuselage"]
 size = Vector3(0.9, 1.2, 5.5)
@@ -59,3 +60,8 @@ shape = SubResource("BoxShape3D_fuselage")
 [node name="WingShape" type="CollisionShape3D" parent="." unique_id=950906126]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.07)
 shape = SubResource("BoxShape3D_wing")
+
+[node name="AimReticle" type="Node" parent="." unique_id=249132858]
+script = ExtResource("7_aim")
+circle_radius = 5.0
+box_half_size = 1.5

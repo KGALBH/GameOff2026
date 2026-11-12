@@ -1,0 +1,37 @@
+[gd_scene format=3 uid="uid://i1xk0m8fntw4"]
+
+[ext_resource type="PackedScene" uid="uid://d2hubxynwvuqj" path="res://Scenes/plane.tscn" id="1_v36qu"]
+[ext_resource type="PackedScene" uid="uid://cpm8vd3der7yn" path="res://Scenes/pixel_filter.tscn" id="2_cggpd"]
+[ext_resource type="Script" uid="uid://i6gjuc4op4ga" path="res://Scripts/play_area.gd" id="3_055b2"]
+[ext_resource type="Script" uid="uid://b312iw0v4g7eh" path="res://Scripts/Level/level_runner.gd" id="4_2mgoq"]
+[ext_resource type="Resource" uid="uid://5d0dy066nht5" path="res://Levels/test_level.tres" id="5_uhnj4"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_ait6c"]
+
+[node name="Level2" type="Node3D" unique_id=2087754546]
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1324071489]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 0, 10, 0)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=194776828]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 30.160519)
+fov = 50.0
+
+[node name="Plane" parent="." unique_id=1222946090 instance=ExtResource("1_v36qu")]
+
+[node name="PixelFilter" parent="." unique_id=1764065551 instance=ExtResource("2_cggpd")]
+
+[node name="PlayArea" type="Node3D" parent="." unique_id=1258093135 node_paths=PackedStringArray("camera", "target")]
+script = ExtResource("3_055b2")
+camera = NodePath("../Camera3D")
+target = NodePath("../Plane")
+follow_smoothing = 4.0
+
+[node name="LevelRunner" type="Node3D" parent="." unique_id=1623176616]
+script = ExtResource("4_2mgoq")
+level = ExtResource("5_uhnj4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=694777053]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -41.022533)
+mesh = SubResource("CapsuleMesh_ait6c")

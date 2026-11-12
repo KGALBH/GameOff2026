@@ -8,12 +8,12 @@
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 
-[sub_resource type="Sky" id="Sky_1"]
+[sub_resource type="Sky" id="Sky_1xe3w"]
 sky_material = SubResource("ProceduralSkyMaterial_1")
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 2
-sky = SubResource("Sky_1")
+sky = SubResource("Sky_1xe3w")
 ambient_light_source = 3
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_nermy"]
@@ -40,9 +40,6 @@ script = ExtResource("5_area")
 camera = NodePath("../Camera3D")
 target = NodePath("../Plane")
 follow_smoothing = 4.0
-edge_margin = null
-out_of_screen_limit = null
-show_warning = null
 
 [node name="LevelRunner" type="Node3D" parent="." unique_id=1506226346]
 script = ExtResource("3_runner")
