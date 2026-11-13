@@ -2,10 +2,10 @@
 
 [ext_resource type="Script" uid="uid://ll1gx0svbxop" path="res://Scripts/plane.gd" id="1_script"]
 [ext_resource type="PackedScene" uid="uid://mfm66wm2rckr" path="res://Resources/Model/飞机正式版.blend" id="2_model"]
-[ext_resource type="Material" path="res://Resources/Materials/plane_body.tres" id="3_body"]
-[ext_resource type="Material" path="res://Resources/Materials/plane_cap.tres" id="4_cap"]
+[ext_resource type="Material" uid="uid://pedvytuf1dv" path="res://Resources/Materials/plane_body.tres" id="3_body"]
+[ext_resource type="Material" uid="uid://bijqdlw7e50ac" path="res://Resources/Materials/plane_cap.tres" id="4_cap"]
 [ext_resource type="Material" path="res://Resources/Materials/plane_propeller.tres" id="5_prop"]
-[ext_resource type="Material" path="res://Resources/Materials/plane_white.tres" id="6_white"]
+[ext_resource type="Material" uid="uid://pjnovefjvgfh" path="res://Resources/Materials/plane_white.tres" id="6_white"]
 [ext_resource type="Script" uid="uid://bci4yvnstbj0y" path="res://Scripts/aim_reticle.gd" id="7_aim"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_fuselage"]
@@ -15,6 +15,7 @@ size = Vector3(0.9, 1.2, 5.5)
 size = Vector3(5.4, 0.5, 1.45)
 
 [node name="Plane" type="RigidBody3D" unique_id=1222946090]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 axis_lock_linear_z = true
 axis_lock_angular_x = true
 axis_lock_angular_y = true
@@ -23,35 +24,38 @@ center_of_mass_mode = 1
 linear_damp = 0.4
 angular_damp = 3.0
 script = ExtResource("1_script")
+thrust_force = 50.0
+thruster_offset = 1.0
+up_force = 50.0
+flip_impulse = 25.0
 
 [node name="Model" parent="." unique_id=206908879 instance=ExtResource("2_model")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.434, 0, 0)
 
-[node name="Camera" parent="Model" index="0"]
-current = false
+[node name="Camera" parent="Model" index="0" unique_id=602361185]
 visible = false
 
-[node name="Cube" parent="Model" index="1"]
+[node name="Cube" parent="Model" index="1" unique_id=1770268318]
 surface_material_override/0 = ExtResource("3_body")
 surface_material_override/1 = ExtResource("4_cap")
 
-[node name="Cylinder" parent="Model" index="2"]
+[node name="Cylinder" parent="Model" index="2" unique_id=1399394823]
 surface_material_override/0 = ExtResource("5_prop")
 
-[node name="Plane" parent="Model" index="3"]
+[node name="Plane" parent="Model" index="3" unique_id=883078471]
 surface_material_override/0 = ExtResource("6_white")
 
-[node name="Text" parent="Model" index="4"]
-surface_material_override/0 = ExtResource("6_white")
-
-[node name="Text_001" parent="Model" index="5"]
-surface_material_override/0 = ExtResource("6_white")
-
-[node name="Text_002" parent="Model" index="6"]
-surface_material_override/0 = ExtResource("6_white")
-
-[node name="Sun" parent="Model" index="7"]
+[node name="Sun" parent="Model" index="4" unique_id=1093309159]
 visible = false
+
+[node name="Text" parent="Model" index="5" unique_id=811061452]
+surface_material_override/0 = ExtResource("6_white")
+
+[node name="Text_001" parent="Model" index="6" unique_id=893753392]
+surface_material_override/0 = ExtResource("6_white")
+
+[node name="Text_002" parent="Model" index="7" unique_id=1958490509]
+surface_material_override/0 = ExtResource("6_white")
 
 [node name="FuselageShape" type="CollisionShape3D" parent="." unique_id=1513534901]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0.53)
@@ -63,5 +67,5 @@ shape = SubResource("BoxShape3D_wing")
 
 [node name="AimReticle" type="Node" parent="." unique_id=249132858]
 script = ExtResource("7_aim")
-circle_radius = 5.0
-box_half_size = 1.5
+
+[editable path="Model"]

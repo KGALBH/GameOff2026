@@ -4,7 +4,13 @@
 [ext_resource type="PackedScene" uid="uid://cpm8vd3der7yn" path="res://Scenes/pixel_filter.tscn" id="2_cggpd"]
 [ext_resource type="Script" uid="uid://i6gjuc4op4ga" path="res://Scripts/play_area.gd" id="3_055b2"]
 [ext_resource type="Script" uid="uid://b312iw0v4g7eh" path="res://Scripts/Level/level_runner.gd" id="4_2mgoq"]
-[ext_resource type="Resource" uid="uid://5d0dy066nht5" path="res://Levels/test_level.tres" id="5_uhnj4"]
+[ext_resource type="Script" uid="uid://drsnxaj5rlj01" path="res://Scripts/Level/level_data.gd" id="5_cggpd"]
+[ext_resource type="Script" uid="uid://wkpvnxxuj80d" path="res://Scripts/Level/wave_entry.gd" id="6_055b2"]
+
+[sub_resource type="Resource" id="Resource_0gr0a"]
+script = ExtResource("5_cggpd")
+level_name = "Level2"
+metadata/_custom_type_script = "uid://drsnxaj5rlj01"
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_ait6c"]
 
@@ -19,6 +25,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 30.160519)
 fov = 50.0
 
 [node name="Plane" parent="." unique_id=1222946090 instance=ExtResource("1_v36qu")]
+flip_impulse = 10.0
 
 [node name="PixelFilter" parent="." unique_id=1764065551 instance=ExtResource("2_cggpd")]
 
@@ -30,7 +37,8 @@ follow_smoothing = 4.0
 
 [node name="LevelRunner" type="Node3D" parent="." unique_id=1623176616]
 script = ExtResource("4_2mgoq")
-level = ExtResource("5_uhnj4")
+level_csv = "uid://vk3282cqx2i5"
+level = SubResource("Resource_0gr0a")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=694777053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -41.022533)

@@ -5,34 +5,38 @@ extends Node
 ##   主推力把它轻轻推向机身"上"方向；玩家按 Shift（手动推进器）会用力推它：
 ##   只按左 → 往机身左边，只按右 → 往机身右边，两侧一起 → 往机身下方。
 ##   飞机往哪边倾斜，推的方向就跟着转；飞机突然加速时框会被甩向反方向。
-## - 判定按画面：敌机投影到屏幕上落在框内、且深度距离不超过 max_depth，就算锁定。框内有多个时锁定平面距离最近的。
+## - 判定按画面：敌机投影到屏幕上一进入圆形索敌范围（画面上的淡色圆）、且在飞机前方 min_depth ~ max_depth 之间，
+##   就立刻锁定，框自动飞过去追踪。范围里有多个时锁定平面距离最近的。
+##   侧面飞来的、已经飞到身后的敌机打不到。
 ## - 锁定后框不再受飞机推力影响，而是咬住目标跟着走；目标跑出圆形范围、射程或被打爆才脱锁，恢复受力移动。
 ## - 伤害按平面距离（只看 XY，不管深度）：离得越近倍率越高。
 ## 飞机读取 target / damage_multiplier 决定要不要开火、打多疼。
 
 ## —— 移动范围 ——
 ## 瞄准框中心能离开飞机的最大距离（米，在飞机所在深度上量）。
-@export var circle_radius: float = 6.0
+@export var circle_radius: float = 5.0
 ## 瞄准框的半边长（米，在飞机所在深度上量）。
-@export var box_half_size: float = 3.5
+@export var box_half_size: float = 1.5
 
 @export_group("受力")
 ## 主推力（一直开着、沿机身"上"方向）推框的力度。故意弱一点，框平时只略微探向机头上方。
-@export var tilt_push: float = 30.0
+@export var tilt_push: float = 20.0
 ## 玩家手动推进器（Shift）推框的力度。单侧往该侧推，两侧一起往下推（按两份算）。比主推力强得多。
-@export var manual_push: float = 70.0
+@export var manual_push: float = 30.0
 ## 把框拉回飞机的弹簧强度。tilt_push / spring = 不按键时框探出去的距离。
-@export var spring: float = 3.0
+@export var spring: float = 8.0
 ## 阻尼，越大框越稳、越不晃。
-@export var damping: float = 2.0
+@export var damping: float = 4.0
 ## 惯性：飞机加速时框被甩向反方向的程度。
 @export var inertia: float = 0.0
 ## 锁定后框追目标的速度，越大咬得越紧。
-@export var track_speed: float = 12.0
+@export var track_speed: float = 20.0
 
 @export_group("锁定与伤害")
 ## 只锁定深度距离在这个范围内的敌机（米）。
 @export var max_depth: float = 80.0
+## 敌机至少要在飞机前方这么远（米）才能锁定。侧面飞来、贴身或已经在身后的敌机都打不到。
+@export var min_depth: float = 1.0
 ## 平面距离为 0 时的伤害倍率。
 @export var damage_mult_near: float = 3.0
 ## 平面距离 ≥ damage_falloff 时的伤害倍率。
@@ -101,7 +105,18 @@ func _track_target(delta: float, cam: Camera3D) -> bool:
 	_last_plane_vel = Vector2(_plane.linear_velocity.x, _plane.linear_velocity.y)
 	if offset.length() > circle_radius:
 		offset = offset.normalized() * circle_radius
-	return box_screen_rect(cam).has_point(cam.unproject_position(target.global_position))
+	# 目标还在圆形索敌范围里就一直追；离开范围才脱锁
+	return _in_search_circle(cam, target)
+
+
+## 敌机在画面上是否落在圆形索敌范围内（就是屏幕上画的那个淡色圆）。
+func _in_search_circle(cam: Camera3D, e: Node3D) -> bool:
+	return _screen_point_to_offset(cam, e.global_position).length() <= search_radius()
+
+
+## 圆形索敌范围的半径（米，在飞机深度上量）= 框中心的活动半径 + 框的半边长。
+func search_radius() -> float:
+	return circle_radius + box_half_size
 
 
 ## 世界点 p 在画面上的位置，换算成"飞机深度平面上相对飞机的偏移"。
@@ -118,7 +133,8 @@ func _is_lockable(e: Node3D, cam: Camera3D) -> bool:
 	if e == null or not is_instance_valid(e) or not e.is_inside_tree() or not e.is_visible_in_tree():
 		return false
 	var depth: float = _plane.global_position.z - e.global_position.z
-	if depth > max_depth or depth < -max_depth * 0.1:
+	# 只打前方：侧面飞来（和飞机同一深度）和已经飞到身后的敌机都不锁定
+	if depth > max_depth or depth < min_depth:
 		return false
 	return not cam.is_position_behind(e.global_position)
 
@@ -181,17 +197,16 @@ func box_screen_rect(cam: Camera3D) -> Rect2:
 	return Rect2(a, b - a).abs()
 
 
-## 未锁定时：在框里找平面距离最近的可锁定敌机。
+## 未锁定时：在圆形索敌范围里找平面距离最近的可锁定敌机，一出现就锁定。
 func _update_target(cam: Camera3D) -> void:
 	damage_multiplier = 1.0
-	var rect: Rect2 = box_screen_rect(cam)
 	var pp: Vector3 = _plane.global_position
 	var best_d: float = INF
 	for n: Node in get_tree().get_nodes_in_group(&"enemies"):
 		var e: Node3D = n as Node3D
 		if not _is_lockable(e, cam):
 			continue
-		if not rect.has_point(cam.unproject_position(e.global_position)):
+		if not _in_search_circle(cam, e):
 			continue
 		var d: float = Vector2(e.global_position.x - pp.x, e.global_position.y - pp.y).length()
 		if d < best_d:

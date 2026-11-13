@@ -2,9 +2,14 @@
 class_name LevelRunner
 extends Node3D
 ## 关卡播放器：读取 LevelData 时间表，到点生成编队。
-## 用法：在关卡场景里加一个 LevelRunner（放在世界原点），把 level 设成一个 LevelData.tres。
-## 编辑器里会画出所有波次的飞行路线；拖动 preview_time 可以看到"第 N 秒时敌机在哪"。
+## 用法：在关卡场景里加一个 LevelRunner（放在世界原点），然后二选一：
+## - level_csv：一个 CSV 表格（推荐，用 Excel 编辑，格式见 level_csv.gd 开头）。设了它就优先用它。
+## - level：一个 LevelData.tres（在检查器里一层层填）。
+## 编辑器里会画出所有波次的飞行路线；改完表格保存，路线会自动刷新。
+## 拖动 preview_time 可以看到"第 N 秒时敌机在哪"。
 
+## 关卡表格（.csv）。设了它就忽略下面的 level。
+@export_file("*.csv") var level_csv: String = ""
 @export var level: LevelData
 
 @export_group("运行")
@@ -46,6 +51,8 @@ func _ready() -> void:
 
 ## 开始（或重新开始）播放关卡。
 func start() -> void:
+	if level_csv != "":
+		level = LevelCsv.load_level(level_csv)
 	if level == null:
 		push_warning("LevelRunner：没有设置 level")
 		return
@@ -144,6 +151,7 @@ func _editor_preview(delta: float) -> void:
 	if _preview_timer > 0.0:
 		return
 	_preview_timer = 0.2
+	_reload_csv_if_changed()
 	if not preview_paths or level == null:
 		PathPreview.clear(self)
 		return
@@ -167,3 +175,21 @@ func _editor_preview(delta: float) -> void:
 			for k: int in w.formation.count:
 				var p: Vector3 = w.formation.position_at(k, w.position, preview_time - w.time)
 				PathPreview.draw_cross(im, p, 1.2, Color.YELLOW)
+
+
+var _csv_loaded_path: String = ""
+var _csv_mtime: int = -1
+
+## 编辑器里：表格文件改过（在 Excel 里保存了）就重新读，预览马上更新。
+func _reload_csv_if_changed() -> void:
+	if level_csv == "":
+		return
+	var real_path: String = LevelCsv.resolve_path(level_csv)
+	var mtime: int = FileAccess.get_modified_time(real_path) if FileAccess.file_exists(real_path) else -1
+	if level_csv == _csv_loaded_path and mtime == _csv_mtime:
+		return
+	_csv_loaded_path = level_csv
+	_csv_mtime = mtime
+	var loaded: LevelData = LevelCsv.load_level(level_csv)
+	if loaded:
+		level = loaded

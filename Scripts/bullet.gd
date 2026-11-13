@@ -2,7 +2,8 @@ class_name Bullet
 extends Area3D
 ## 子弹：撞到物体或超过寿命后消失。
 ## - 有 target（瞄准框锁定的敌机）：追踪飞向目标，转向速度受 homing_turn_rate 限制。
-## - 没有 target（比如翻面时向外散射，或目标中途死了）：按 velocity 直线飞，同时跟着发射者在画面里（XY）平移。
+##   目标中途被打爆或脱锁：不改追新目标，保持当前速度顺势直线飞走，寿命到了才消失。
+## - 没有 target（比如翻面时向外散射）：按 velocity 直线飞，同时跟着发射者在画面里（XY）平移。
 
 ## 飞行速度（米/秒）。
 @export var speed: float = 60.0
@@ -22,6 +23,8 @@ var velocity: Vector3 = Vector3.ZERO
 var _age: float = 0.0
 ## 是否是追踪弹（发射时带了目标）。
 var _homing: bool = false
+## 追踪弹丢失了目标（之后一直直线飞）。
+var _lost_target: bool = false
 ## 发射者上一帧的位置（无目标的子弹跟随平移用）。
 var _shooter_last_pos: Vector3
 var _has_last_pos: bool = false
@@ -44,17 +47,18 @@ func _physics_process(delta: float) -> void:
 	if velocity == Vector3.ZERO:
 		velocity = -global_basis.z * speed
 	# 发射者是在 add_child 之后才设置 target 的，所以在这里记下"我是追踪弹"
-	if is_instance_valid(target):
+	if not _homing and not _lost_target and is_instance_valid(target):
 		_homing = true
-	# 追踪的目标没了（被打爆了）：改追飞机当前锁定的新目标；没有新目标就直接消失，
-	# 不让它变成直线乱飞、散落在画面各处
-	if _homing and (target == null or not is_instance_valid(target)):
-		target = _shooter_current_target()
-		if target == null:
-			queue_free()
-			return
-	if target:
+	# 追踪弹只追发射时的那个目标。目标被打爆、或者被瞄准框脱锁（飞到侧面/身后、离开索敌圈）时，
+	# 不改追新目标，保持当前速度顺势直线飞走，直到寿命结束
+	if _homing and (not is_instance_valid(target) or target != _shooter_current_target()):
+		target = null
+		_homing = false
+		_lost_target = true
+	if _homing:
 		_fly_homing(delta)
+	elif _lost_target:
+		_fly_straight(delta)
 	else:
 		_fly_free(delta)
 
@@ -81,6 +85,11 @@ func _fly_homing(delta: float) -> void:
 		velocity = current.slerp(desired, step) * speed
 	global_position += velocity * delta
 	_face(velocity)
+
+
+## 丢失目标后：按当前速度直线飞（不再跟着飞机平移，也不转弯）。
+func _fly_straight(delta: float) -> void:
+	global_position += velocity * delta
 
 
 ## 普通飞行：按 velocity 飞，同时跟着发射者在画面里平移。

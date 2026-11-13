@@ -3,8 +3,11 @@
 [ext_resource type="PackedScene" uid="uid://d2hubxynwvuqj" path="res://Scenes/plane.tscn" id="1_plane"]
 [ext_resource type="PackedScene" uid="uid://cpm8vd3der7yn" path="res://Scenes/pixel_filter.tscn" id="2_pixel"]
 [ext_resource type="Script" uid="uid://b312iw0v4g7eh" path="res://Scripts/Level/level_runner.gd" id="3_runner"]
-[ext_resource type="Resource" uid="uid://5d0dy066nht5" path="res://Levels/test_level.tres" id="4_level"]
 [ext_resource type="Script" uid="uid://i6gjuc4op4ga" path="res://Scripts/play_area.gd" id="5_area"]
+[ext_resource type="Script" uid="uid://drsnxaj5rlj01" path="res://Scripts/Level/level_data.gd" id="5_ep1go"]
+[ext_resource type="Script" uid="uid://wkpvnxxuj80d" path="res://Scripts/Level/wave_entry.gd" id="6_8d3qu"]
+[ext_resource type="PackedScene" uid="uid://bwqhbly5cuylh" path="res://Scenes/enemy.tscn" id="7_ksfjk"]
+[ext_resource type="Script" uid="uid://c65w8b15k64m7" path="res://Scripts/Level/formation_data.gd" id="8_qeioy"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_1"]
 
@@ -15,6 +18,87 @@ sky_material = SubResource("ProceduralSkyMaterial_1")
 background_mode = 2
 sky = SubResource("Sky_1xe3w")
 ambient_light_source = 3
+
+[sub_resource type="Resource" id="Resource_gi2y7"]
+script = ExtResource("8_qeioy")
+count = 11
+shape = 1
+spacing = 1.8
+
+[sub_resource type="Resource" id="Resource_lce14"]
+script = ExtResource("6_8d3qu")
+note = "深处 V 字 11 架"
+formation = SubResource("Resource_gi2y7")
+position = Vector3(0, 2, -160)
+time = 0.5
+
+[sub_resource type="Resource" id="Resource_tib2k"]
+script = ExtResource("8_qeioy")
+shape = 3
+spacing = 2.0
+grid_columns = 15
+stagger = 1.0
+
+[sub_resource type="Resource" id="Resource_kmhuf"]
+script = ExtResource("6_8d3qu")
+note = "深处环形一圈"
+formation = SubResource("Resource_tib2k")
+time = 2.0
+
+[sub_resource type="Resource" id="Resource_2c6st"]
+script = ExtResource("8_qeioy")
+count = 14
+shape = 4
+stagger = 0.15
+override_movement = true
+speed = 18.0
+pattern = 1
+amplitude = 5.0
+frequency = 0.4
+
+[sub_resource type="Resource" id="Resource_0ecg0"]
+script = ExtResource("6_8d3qu")
+note = "深处蛇形纵队 14 架"
+formation = SubResource("Resource_2c6st")
+position = Vector3(-5, -3, -160)
+time = 4.0
+
+[sub_resource type="Resource" id="Resource_vhi2e"]
+script = ExtResource("8_qeioy")
+count = 8
+spacing = 1.6
+override_movement = true
+direction = Vector3(1, 0, 0)
+speed = 10.0
+pattern = 1
+amplitude = 1.5
+
+[sub_resource type="Resource" id="Resource_ibqwk"]
+script = ExtResource("6_8d3qu")
+note = "上一波结束 1 秒后左侧横飞 8 架"
+formation = SubResource("Resource_vhi2e")
+position = Vector3(-32, 2, 0)
+trigger = 1
+time = 1.0
+
+[sub_resource type="Resource" id="Resource_14nuf"]
+script = ExtResource("8_qeioy")
+count = 15
+shape = 2
+spacing = 2.0
+grid_columns = 5
+
+[sub_resource type="Resource" id="Resource_f35u3"]
+script = ExtResource("6_8d3qu")
+note = "最后一波 5×3 方阵直飞"
+formation = SubResource("Resource_14nuf")
+trigger = 1
+time = 1.0
+
+[sub_resource type="Resource" id="Resource_aa638"]
+script = ExtResource("5_ep1go")
+level_name = "test_level"
+waves = Array[ExtResource("6_8d3qu")]([SubResource("Resource_lce14"), SubResource("Resource_kmhuf"), SubResource("Resource_0ecg0"), SubResource("Resource_ibqwk"), SubResource("Resource_f35u3")])
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_nermy"]
 
@@ -43,7 +127,8 @@ follow_smoothing = 4.0
 
 [node name="LevelRunner" type="Node3D" parent="." unique_id=1506226346]
 script = ExtResource("3_runner")
-level = ExtResource("4_level")
+level_csv = "res://Levels/test_level.csv"
+level = SubResource("Resource_aa638")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1605635356]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -41.022533)

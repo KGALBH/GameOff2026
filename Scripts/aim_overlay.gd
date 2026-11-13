@@ -23,7 +23,7 @@ func _draw() -> void:
 	var plane_pos: Vector3 = reticle._plane.global_position
 	# 圆形范围（在飞机深度上投影，半径换算成像素）
 	var c: Vector2 = cam.unproject_position(plane_pos)
-	var edge: Vector2 = cam.unproject_position(plane_pos + Vector3(reticle.circle_radius + reticle.box_half_size, 0, 0))
+	var edge: Vector2 = cam.unproject_position(plane_pos + Vector3(reticle.search_radius(), 0, 0))
 	draw_arc(c, c.distance_to(edge), 0.0, TAU, 48, reticle.color_circle, 1.5)
 
 	var locked: bool = is_instance_valid(reticle.target)
