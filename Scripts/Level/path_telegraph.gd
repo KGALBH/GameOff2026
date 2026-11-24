@@ -83,6 +83,9 @@ func _rebuild() -> void:
 	if progress > 0.8 and progress < 1.0:
 		flash = flash_alpha * (0.5 + 0.5 * cos(_time * TAU * 8.0))
 
+	# 完全淡出 / 没有轨迹时什么都不画（否则 surface_end 会报"No vertices were added"）
+	if _paths.is_empty() or fade * maxf(base_alpha, edge_alpha) <= 0.001:
+		return
 	_im.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i: int in _paths.size():
 		var path: PackedVector3Array = _paths[i]

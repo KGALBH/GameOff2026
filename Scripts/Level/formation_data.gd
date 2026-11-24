@@ -10,6 +10,8 @@ enum Shape {
 	GRID,    ## 方阵
 	CIRCLE,  ## 环形
 	TRAIL,   ## 一路纵队：同一位置一架接一架出发
+	SEMICIRCLE,  ## 半圆：弧顶朝前进方向（横飞时在画面里是一个"("或")"）
+	DIAMOND,     ## 斜 45° 的空心正方形（菱形），飞机只排在四条边上
 }
 
 ## 敌机场景（换不同敌机就换这个）。
@@ -26,6 +28,8 @@ enum Shape {
 @export var stagger: float = 0.0
 ## 每架之间的摆动相位差（0~1），配合 SINE/CIRCLE 做出波浪感。
 @export_range(0.0, 1.0) var phase_step: float = 0.0
+## 整个阵型绕前进方向旋转多少度（逆时针）。比如从深处飞来的半圆默认弧顶朝上，转 90 = 朝左，-90 = 朝右。
+@export_range(-180.0, 180.0) var shape_rotation_deg: float = 0.0
 
 @export_group("横向预警")
 ## 横着飞（在画面平面里飞）的编队，出发前先沿轨迹显示攻击预警（像 MMO 的技能前摇）。
@@ -155,8 +159,15 @@ func _has_same_path(paths: Array[PackedVector3Array], pts: PackedVector3Array) -
 	return false
 
 
-## 第 i 架在阵型里的偏移（在垂直于前进方向的平面内排列）。
+## 第 i 架在阵型里的偏移（在垂直于前进方向的平面内排列），再按 shape_rotation_deg 绕前进方向旋转。
 func slot_offset(i: int, dir: Vector3) -> Vector3:
+	var o: Vector3 = _raw_slot_offset(i, dir)
+	if is_zero_approx(shape_rotation_deg):
+		return o
+	return o.rotated(EnemyPath.forward(dir), deg_to_rad(shape_rotation_deg))
+
+
+func _raw_slot_offset(i: int, dir: Vector3) -> Vector3:
 	var fwd: Vector3 = EnemyPath.forward(dir)
 	var side: Vector3 = EnemyPath.side_axis(fwd)
 	var up: Vector3 = EnemyPath.up_axis(fwd, side)
@@ -183,6 +194,22 @@ func slot_offset(i: int, dir: Vector3) -> Vector3:
 			var a: float = TAU * i / count
 			var radius: float = spacing * count / TAU
 			return (side * cos(a) + spread_b * sin(a)) * radius
+		Shape.SEMICIRCLE:
+			# 弧顶朝"画面里的前进方向"：横飞时就是前进方向，从深处飞来时朝上
+			var bulge: Vector3 = fwd if absf(fwd.z) <= 0.7 else Vector3.UP
+			var a2: float = PI * (float(i) / maxf(count - 1, 1) - 0.5)
+			var r2: float = spacing * maxf(count - 1, 1) / PI
+			return (side * sin(a2) + bulge * cos(a2)) * r2
+		Shape.DIAMOND:
+			# 沿菱形四条边均匀排列；顶点 = 上、右、下、左
+			var u: float = 4.0 * i / count
+			var k: int = floori(u)
+			var f: float = u - k
+			var verts: Array[Vector2] = [Vector2(0, 1), Vector2(1, 0), Vector2(0, -1), Vector2(-1, 0)]
+			var p: Vector2 = verts[k % 4].lerp(verts[(k + 1) % 4], f)
+			# 边长 ≈ 每条边的飞机数 × 间距
+			var r3: float = spacing * count / 4.0 / sqrt(2.0)
+			return (side * p.x + spread_b * p.y) * r3
 	# TRAIL：全部从同一点出发，靠 stagger 拉开
 	return Vector3.ZERO
 

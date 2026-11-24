@@ -6,7 +6,7 @@ extends Node3D
 ## - 直接摆进场景用：设置 data，勾 spawn_on_ready。
 ## - 关卡里用：LevelRunner 会自动创建它，不需要手动摆。
 ## 编辑器里会画出每架敌机的飞行路线（preview_paths）。
-## 整队消失时发 SignalBus.formation_finished(formation, killed, total)。
+## 整队消失时发 SignalBus.formation_finished(formation, total)。
 
 ## 编队数据（可以新建内嵌的，也可以拖一个 .tres 进来复用）。
 @export var data: FormationData
@@ -24,10 +24,9 @@ extends Node3D
 @export var preview_duration: float = 12.0
 @export var preview_color: Color = Color(1, 0.4, 0.2)
 
-## 本队总架数 / 已消失架数 / 被打爆架数。
+## 本队总架数 / 已消失架数。
 var total: int = 0
 var gone: int = 0
-var killed: int = 0
 ## 是否已经整队结束。
 var finished: bool = false
 
@@ -72,7 +71,6 @@ func spawn() -> void:
 		return
 	total = data.count
 	gone = 0
-	killed = 0
 	finished = false
 	for i: int in data.count:
 		var enemy: Node3D = data.create_enemy(i, global_position)
@@ -92,10 +90,8 @@ func spawn() -> void:
 		telegraph.visible = telegraph.start_delay <= 0.0
 
 
-func _on_enemy_removed(was_killed: bool) -> void:
+func _on_enemy_removed() -> void:
 	gone += 1
-	if was_killed:
-		killed += 1
 	if gone >= total:
 		_finish()
 
@@ -105,4 +101,4 @@ func _finish() -> void:
 		return
 	finished = true
 	# @tool 脚本里不直接写 SignalBus 标识符，避免编辑器没刷新 Autoload 时整个脚本编译失败
-	get_node(^"/root/SignalBus").emit_signal(&"formation_finished", self, killed, total)
+	get_node(^"/root/SignalBus").emit_signal(&"formation_finished", self, total)

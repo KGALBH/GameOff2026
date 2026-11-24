@@ -7,11 +7,11 @@ extends RefCounted
 ##
 ## 列（中文或英文表头都行）：
 ##   备注 note        随便写，只给人看
-##   触发 trigger     时间 / 接上一波（默认 时间）
-##   时间 time        触发=时间：关卡第几秒出发；触发=接上一波：上一波清完后等几秒
+##   触发 trigger     时间 / 接上一波 / 同上一波（默认 时间）
+##   时间 time        触发=时间：关卡第几秒出发；接上一波：上一波清完后等几秒；同上一波：上一波出发后等几秒
 ##   敌机 enemy       留空 = 默认敌机；可以写 res:// 路径，或 Scenes/Enemies 里的场景名（不带 .tscn）
 ##   数量 count       默认 5
-##   阵型 shape       横排 / V字 / 方阵 / 环形 / 纵队（默认 横排）
+##   阵型 shape       横排 / V字 / 方阵 / 环形 / 纵队 / 半圆 / 菱形（空心，斜 45° 正方形）（默认 横排）
 ##   间距 spacing     米，默认 3
 ##   每行 columns     方阵每行几架，默认 3
 ##   出发间隔 stagger 每架之间隔几秒出发（纵队靠它拉开），默认 0
@@ -19,9 +19,10 @@ extends RefCounted
 ##   方向 direction   深处 / 左 / 右 / 上 / 下（= 从哪边飞进来），或者三个数字 "1 0 0"；默认 深处
 ##   X Y Z            出发点。留空时按方向给默认值：深处 z=-160，左 x=-32，右 x=32，上 y=20，下 y=-20
 ##   速度 speed       米/秒
-##   轨迹 pattern     直线 / 蛇形 / 之字 / 螺旋
+##   轨迹 pattern     直线 / 蛇形（左右）/ 上下浮动 / 之字 / 螺旋
 ##   幅度 amplitude   摆动幅度（米）
 ##   频率 frequency   每秒摆几个来回
+##   旋转 rotation    整个阵型在画面里转多少度（逆时针）。深处飞来的半圆弧顶默认朝上：90 = 朝左，-90 = 朝右，180 = 朝下
 ##   预警 warning     是 / 否：横飞编队出发前是否显示预警（默认 是）
 ## 方向、速度、轨迹、幅度、频率任填一个就会覆盖敌机场景里的轨迹设置，没填的用敌机场景的值。
 ##
@@ -47,6 +48,7 @@ const HEADER_ALIASES = {
 	"幅度": "amplitude", "amplitude": "amplitude",
 	"频率": "frequency", "frequency": "frequency",
 	"预警": "warning", "warning": "warning",
+	"旋转": "rotation", "rotation": "rotation",
 }
 
 const SHAPES = {
@@ -55,6 +57,8 @@ const SHAPES = {
 	"方阵": FormationData.Shape.GRID, "grid": FormationData.Shape.GRID,
 	"环形": FormationData.Shape.CIRCLE, "circle": FormationData.Shape.CIRCLE,
 	"纵队": FormationData.Shape.TRAIL, "trail": FormationData.Shape.TRAIL,
+	"半圆": FormationData.Shape.SEMICIRCLE, "semicircle": FormationData.Shape.SEMICIRCLE,
+	"菱形": FormationData.Shape.DIAMOND, "空心菱形": FormationData.Shape.DIAMOND, "diamond": FormationData.Shape.DIAMOND,
 }
 
 const PATTERNS = {
@@ -62,6 +66,7 @@ const PATTERNS = {
 	"蛇形": EnemyPath.Pattern.SINE, "sine": EnemyPath.Pattern.SINE,
 	"之字": EnemyPath.Pattern.ZIGZAG, "zigzag": EnemyPath.Pattern.ZIGZAG,
 	"螺旋": EnemyPath.Pattern.CIRCLE, "画圈": EnemyPath.Pattern.CIRCLE, "spiral": EnemyPath.Pattern.CIRCLE,
+	"上下浮动": EnemyPath.Pattern.BOB, "浮动": EnemyPath.Pattern.BOB, "bob": EnemyPath.Pattern.BOB,
 }
 
 ## 方向关键字 → [前进方向, 默认出发点]
@@ -156,7 +161,12 @@ static func _make_wave(cells: Dictionary, path: String, line: int) -> WaveEntry:
 	w.note = cells.get("note", "")
 
 	var trig: String = String(cells.get("trigger", "")).to_lower()
-	w.trigger = WaveEntry.Trigger.AFTER_PREVIOUS if trig in ["接上一波", "上一波后", "after", "after_previous"] else WaveEntry.Trigger.AT_TIME
+	if trig in ["接上一波", "上一波后", "after", "after_previous"]:
+		w.trigger = WaveEntry.Trigger.AFTER_PREVIOUS
+	elif trig in ["同上一波", "和上一波同时", "with", "with_previous"]:
+		w.trigger = WaveEntry.Trigger.WITH_PREVIOUS
+	else:
+		w.trigger = WaveEntry.Trigger.AT_TIME
 	w.time = _num(cells, "time", 0.0, where)
 
 	var enemy_name: String = cells.get("enemy", "")
@@ -172,6 +182,7 @@ static func _make_wave(cells: Dictionary, path: String, line: int) -> WaveEntry:
 	f.grid_columns = maxi(1, int(_num(cells, "columns", 3, where)))
 	f.stagger = _num(cells, "stagger", 0.0, where)
 	f.phase_step = _num(cells, "phase", 0.0, where)
+	f.shape_rotation_deg = _num(cells, "rotation", 0.0, where)
 	var warn: String = String(cells.get("warning", "")).to_lower()
 	f.lateral_warning = not (warn in ["否", "不", "no", "false", "0"])
 

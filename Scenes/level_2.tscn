@@ -6,11 +6,85 @@
 [ext_resource type="Script" uid="uid://b312iw0v4g7eh" path="res://Scripts/Level/level_runner.gd" id="4_2mgoq"]
 [ext_resource type="Script" uid="uid://drsnxaj5rlj01" path="res://Scripts/Level/level_data.gd" id="5_cggpd"]
 [ext_resource type="Script" uid="uid://wkpvnxxuj80d" path="res://Scripts/Level/wave_entry.gd" id="6_055b2"]
+[ext_resource type="PackedScene" uid="uid://bwqhbly5cuylh" path="res://Scenes/enemy.tscn" id="7_2mgoq"]
+[ext_resource type="Script" uid="uid://c65w8b15k64m7" path="res://Scripts/Level/formation_data.gd" id="8_uhnj4"]
 
-[sub_resource type="Resource" id="Resource_0gr0a"]
+[sub_resource type="Resource" id="Resource_42uki"]
+script = ExtResource("8_uhnj4")
+shape = 3
+spacing = 2.0
+grid_columns = 15
+stagger = 1.0
+shape_rotation_deg = null
+override_movement = true
+pattern = 3
+
+[sub_resource type="Resource" id="Resource_t7v2y"]
+script = ExtResource("6_055b2")
+note = "深处环形一圈"
+formation = SubResource("Resource_42uki")
+position = Vector3(-30, 0, -70)
+time = 2.0
+
+[sub_resource type="Resource" id="Resource_ait6c"]
+script = ExtResource("8_uhnj4")
+count = 14
+shape = 4
+stagger = 0.15
+shape_rotation_deg = null
+override_movement = true
+speed = 18.0
+pattern = 1
+amplitude = 5.0
+frequency = 0.4
+
+[sub_resource type="Resource" id="Resource_vcilj"]
+script = ExtResource("6_055b2")
+note = "深处蛇形纵队 14 架"
+formation = SubResource("Resource_ait6c")
+position = Vector3(-5, -3, -70)
+time = 4.0
+
+[sub_resource type="Resource" id="Resource_bl0du"]
+script = ExtResource("8_uhnj4")
+count = 15
+spacing = 1.6
+shape_rotation_deg = null
+override_movement = true
+direction = Vector3(1, 0, 0)
+speed = 10.0
+pattern = 1
+amplitude = 1.5
+
+[sub_resource type="Resource" id="Resource_q0ycs"]
+script = ExtResource("6_055b2")
+note = "上一波结束 1 秒后左侧横飞 8 架"
+formation = SubResource("Resource_bl0du")
+position = Vector3(-32, 2, 0)
+trigger = 1
+time = 0.5
+
+[sub_resource type="Resource" id="Resource_hj5x7"]
+script = ExtResource("8_uhnj4")
+count = 15
+shape = 2
+spacing = 2.0
+grid_columns = 5
+shape_rotation_deg = null
+override_movement = true
+pattern = 3
+
+[sub_resource type="Resource" id="Resource_yvrk7"]
+script = ExtResource("6_055b2")
+note = "最后一波 5×3 方阵直飞"
+formation = SubResource("Resource_hj5x7")
+position = Vector3(20, 0, -70)
+time = 5.0
+
+[sub_resource type="Resource" id="Resource_fhuy1"]
 script = ExtResource("5_cggpd")
 level_name = "Level2"
-metadata/_custom_type_script = "uid://drsnxaj5rlj01"
+waves = Array[ExtResource("6_055b2")]([SubResource("Resource_t7v2y"), SubResource("Resource_vcilj"), SubResource("Resource_q0ycs"), SubResource("Resource_yvrk7")])
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_ait6c"]
 
@@ -38,7 +112,7 @@ follow_smoothing = 4.0
 [node name="LevelRunner" type="Node3D" parent="." unique_id=1623176616]
 script = ExtResource("4_2mgoq")
 level_csv = "uid://vk3282cqx2i5"
-level = SubResource("Resource_0gr0a")
+level = SubResource("Resource_fhuy1")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=694777053]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -41.022533)

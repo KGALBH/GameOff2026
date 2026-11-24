@@ -1,9 +1,7 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://Scripts/Enemies/enemy_plane.gd" id="1_enemy"]
 [ext_resource type="Script" path="res://Scripts/Enemies/move_sine.gd" id="2_move"]
-[ext_resource type="Script" path="res://Scripts/Enemies/attack_shoot.gd" id="3_attack"]
-[ext_resource type="PackedScene" path="res://Scenes/Enemies/enemy_bullet.tscn" id="4_bullet"]
 
 [sub_resource type="Resource" id="Resource_move"]
 script = ExtResource("2_move")
@@ -11,14 +9,6 @@ velocity = Vector3(0, 0, 8)
 sway_axis = Vector3(1, 0, 0)
 amplitude = 4.0
 frequency = 0.4
-
-[sub_resource type="Resource" id="Resource_attack"]
-script = ExtResource("3_attack")
-bullet_scene = ExtResource("4_bullet")
-bullet_speed = 15.0
-aim_at_player = true
-cooldown = 1.5
-first_delay = 1.0
 
 [sub_resource type="StandardMaterial3D" id="Mat_enemy"]
 albedo_color = Color(0.75, 0.15, 0.15, 1)
@@ -43,7 +33,6 @@ collision_layer = 4
 collision_mask = 0
 script = ExtResource("1_enemy")
 movement = SubResource("Resource_move")
-attack = SubResource("Resource_attack")
 
 [node name="Model" type="Node3D" parent="."]
 

@@ -1,0 +1,26 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/plane.tscn" id="1_plane"]
+[ext_resource type="PackedScene" path="res://Scenes/enemy.tscn" id="2_enemy"]
+
+[node name="HitTest" type="Node3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 30)
+fov = 50.0
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 0, 10, 0)
+
+[node name="Plane" parent="." instance=ExtResource("1_plane")]
+freeze = true
+
+[node name="Enemy1" parent="." instance=ExtResource("2_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -20)
+pattern = 0
+show_landing_marker = false
+
+[node name="Enemy2" parent="." instance=ExtResource("2_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -26)
+pattern = 0
+show_landing_marker = false

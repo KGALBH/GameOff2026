@@ -50,54 +50,56 @@ var _reset_requested: bool = false
 ## 俯仰跟随速度，越大越灵敏、越小越柔和。
 @export var pitch_smoothing: float = 6.0
 
-## —— 自动射击：机头炮 ——
-## 机头炮是否自动开火。
-@export var auto_fire: bool = true
-## 机头炮子弹场景。
-@export var head_bullet_scene: PackedScene = preload("res://Scenes/bullet.tscn")
-## 机头炮两发间隔（秒）。
-@export var fire_interval: float = 0.05
-## 机头枪口位置（相对机身，机头朝 -Z）。
-@export var muzzle_offset: Vector3 = Vector3(0, 0, -2.8)
-var _fire_timer: float = 0.0
+## —— 生命（避障：撞到障碍扣一条命）——
+## 一共几条命。
+@export var max_lives: int = 3
+## 被撞后的无敌时间（秒），期间飞机闪烁、不会再扣命。
+@export var invincible_time: float = 1.5
 
-## —— 自动射击：翼尖炮（左右机翼各一门，同时开火）——
-## 翼尖炮是否自动开火。
-@export var wing_auto_fire: bool = true
-## 翼尖炮子弹场景。
-@export var wing_bullet_scene: PackedScene = preload("res://Scenes/wing_bullet.tscn")
-## 翼尖炮两发间隔（秒） 。
-@export var wing_fire_interval: float = 0.20
-## 右翼尖枪口位置（左翼自动取 X 镜像）。
-@export var wing_muzzle_offset: Vector3 = Vector3(2.5, 0, -0.8)
-var _wing_fire_timer: float = 0.0
-
-## 翻面时翼尖弹的飞行速度（沿机翼向外，米/秒；翻面时不带向前的速度）。
-@export var flip_spread_speed: float = 20.0
-## 翻面时翼尖炮的射速倍率（2 = 射速翻倍）。
-@export var flip_fire_rate_multiplier: float = 5.0
-
-## 自动瞄准框（子节点 AimReticle）。框里锁定到敌机才开火；没有这个节点时按老规则一直开火。
-@onready var _aim: AimReticle = get_node_or_null(^"AimReticle") as AimReticle
+## 当前剩几条命。
+var lives: int
+## 是否已经撞毁（命用完了）。
+var dead: bool = false
+var _invincible_left: float = 0.0
+var _hud: Label
 
 @onready var _model: Node3D = $Model
 var _model_base: Transform3D
 var _pitch: float = 0.0
 
 
-## 当前按着哪侧推进器：x = 左（0/1），y = 右（0/1）。瞄准框用它决定往哪推。
-func manual_thrust_sides() -> Vector2i:
-	return Vector2i(int(_left_held), int(_right_held))
+## 被障碍撞到（敌机等调用）：扣一条命，之后短暂无敌。命用完 → 撞毁判负。
+## source 可以是撞到自己的节点，也可以是数字（队友的 EnemyPlane 会传伤害值）；不管是什么，都扣一条命。
+func take_hit(source: Variant = null) -> void:
+	if dead or _invincible_left > 0.0:
+		return
+	lives -= 1
+	SignalBus.player_hit.emit(source as Node if source is Node else null)
+	SignalBus.player_lives_changed.emit(lives)
+	_invincible_left = invincible_time
+	if lives <= 0:
+		dead = true
+		SignalBus.player_failed.emit("crashed")
+	_update_hud()
 
 
-## 受到伤害（敌机碰撞等调用）。现在只发信号，血量以后再做。
-func take_hit(source: Node) -> void:
-	SignalBus.player_hit.emit(source)
+## 回满命（按 R 重来时调用）。
+func _restore_lives() -> void:
+	lives = max_lives
+	dead = false
+	_invincible_left = 0.0
+	_model.visible = true
+	SignalBus.player_lives_changed.emit(lives)
+	SignalBus.player_respawned.emit()
+	_update_hud()
 
 
 func _ready() -> void:
 	_spawn_transform = global_transform
 	_model_base = _model.transform
+	add_to_group(&"player")  # 敌机靠这个组找玩家（擦边判定等）
+	_build_hud()
+	_restore_lives()
 
 
 func _process(delta: float) -> void:
@@ -110,52 +112,36 @@ func _process(delta: float) -> void:
 	# 机头朝 -Z，绕机身 X 轴正转 = 抬头
 	_model.transform = Transform3D(Basis(Vector3.RIGHT, _pitch), Vector3.ZERO) * _model_base
 
-	# 有瞄准框时：框里锁定到敌机才开火
-	var has_target: bool = _aim == null or is_instance_valid(_aim.target)
-
-	if auto_fire and head_bullet_scene:
-		_fire_timer = maxf(_fire_timer - delta, 0.0)
-		if _fire_timer <= 0.0 and !_flipping and has_target:
-			_fire_timer += fire_interval
-			_spawn_bullet(head_bullet_scene, muzzle_offset)
-
-	if wing_auto_fire and wing_bullet_scene:
-		# 翻面时射速加快
-		var interval: float = wing_fire_interval
-		if _flipping:
-			interval /= maxf(flip_fire_rate_multiplier, 0.01)
-		# 刚开始翻面时不用等完普通间隔，立刻进入快速射击
-		_wing_fire_timer = minf(_wing_fire_timer, interval) - delta
-		if _wing_fire_timer <= 0.0:
-			_wing_fire_timer += interval
-			if _flipping:
-				# 翻面时：取消向前的速度，只沿机翼向外射。机身在转，所以子弹会洒向四周一圈
-				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset, global_basis.x * flip_spread_speed, false)
-				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1), -global_basis.x * flip_spread_speed, false)
-			elif has_target:
-				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset)
-				_spawn_bullet(wing_bullet_scene, wing_muzzle_offset * Vector3(-1, 1, 1))
-			else:
-				# 没目标时不射，计时器停在 0，一锁定就立刻开火
-				_wing_fire_timer = 0.0
+	# 无敌期间闪烁
+	if _invincible_left > 0.0:
+		_invincible_left -= delta
+		_model.visible = _invincible_left <= 0.0 or fmod(_invincible_left, 0.2) > 0.1
 
 
-## 在机身局部坐标 local_offset 处，沿机身前方（不含俯仰表现）发射一颗子弹，
-## extra_velocity 会叠加到子弹的飞行速度上；forward = false 时不带向前的速度，只用 extra_velocity。
-## 往前射的子弹会追踪瞄准框锁定的目标。
-func _spawn_bullet(scene: PackedScene, local_offset: Vector3, extra_velocity: Vector3 = Vector3.ZERO, forward: bool = true) -> void:
-	var bullet: Bullet = scene.instantiate() as Bullet
-	bullet.shooter = self
-	get_tree().current_scene.add_child(bullet)
-	bullet.global_transform = Transform3D(global_basis.orthonormalized(), global_transform * local_offset)
-	var forward_velocity: Vector3 = -bullet.global_basis.z * bullet.speed if forward else Vector3.ZERO
-	bullet.velocity = forward_velocity + extra_velocity
-	# 普通往前射的子弹：追踪瞄准框锁定的敌机，伤害乘上距离倍率
-	if forward and _aim and is_instance_valid(_aim.target):
-		bullet.target = _aim.target
-		bullet.damage *= _aim.damage_multiplier
+func _build_hud() -> void:
+	var layer: CanvasLayer = CanvasLayer.new()
+	layer.layer = 20  # 在像素滤镜（layer 10）之上，文字保持清晰
+	add_child(layer)
+	_hud = Label.new()
+	_hud.position = Vector2(24, 16)
+	_hud.add_theme_font_size_override(&"font_size", 28)
+	_hud.add_theme_color_override(&"font_outline_color", Color.BLACK)
+	_hud.add_theme_constant_override(&"outline_size", 8)
+	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(_hud)
 
- 
+
+func _update_hud() -> void:
+	if _hud == null:
+		return
+	if dead:
+		_hud.add_theme_color_override(&"font_color", Color(1, 0.3, 0.3))
+		_hud.text = "生命  " + "□ ".repeat(max_lives)
+	else:
+		_hud.add_theme_color_override(&"font_color", Color.WHITE)
+		_hud.text = "生命  " + "■ ".repeat(lives) + "□ ".repeat(max_lives - lives)
+
+
 ## 左右推进器的按键状态（不用 Input.is_action_pressed，原因见 _input）。
 var _left_held: bool = false
 var _right_held: bool = false
@@ -262,6 +248,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		state.transform = _spawn_transform
 		state.linear_velocity = Vector3.ZERO
 		state.angular_velocity = Vector3.ZERO
+		_restore_lives.call_deferred()
 		_flipping = false
 		_flip_requested = false
 		return

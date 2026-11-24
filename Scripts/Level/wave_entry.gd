@@ -6,6 +6,7 @@ extends Resource
 enum Trigger {
 	AT_TIME,          ## 关卡开始后第 time 秒出发
 	AFTER_PREVIOUS,   ## 上一波全部消失后再过 time 秒出发
+	WITH_PREVIOUS,    ## 上一波出发后再过 time 秒出发（和上一波同时进行）
 }
 
 ## 备注（只给人看，比如"第一波 V 字"）。
@@ -16,5 +17,5 @@ enum Trigger {
 @export var position: Vector3 = Vector3(0, 0, -160)
 ## 触发方式。
 @export var trigger: Trigger = Trigger.AT_TIME
-## AT_TIME：关卡开始后的秒数；AFTER_PREVIOUS：上一波结束后的等待秒数。
+## AT_TIME：关卡开始后的秒数；AFTER_PREVIOUS：上一波结束后的等待秒数；WITH_PREVIOUS：上一波出发后的等待秒数。
 @export var time: float = 0.0

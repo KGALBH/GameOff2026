@@ -9,6 +9,7 @@ enum Pattern {
 	SINE,      ## 正弦波（左右蛇形）
 	ZIGZAG,    ## 折线（之字形）
 	CIRCLE,    ## 绕前进方向画圈（螺旋前进）
+	BOB,       ## 上下浮动（世界竖直方向摆动）
 }
 
 
@@ -52,4 +53,6 @@ static func wobble(pattern: int, amplitude: float, frequency: float, phase: floa
 			return side * amplitude * tri
 		Pattern.CIRCLE:
 			return (side * cos(a) + up * sin(a)) * amplitude
+		Pattern.BOB:
+			return Vector3.UP * amplitude * sin(a)
 	return Vector3.ZERO

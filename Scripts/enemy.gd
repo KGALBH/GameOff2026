@@ -5,7 +5,6 @@ extends Area3D
 ## - 轨迹：沿 direction 方向以 speed 前进，再叠加 pattern 指定的横向摆动。
 ##   从屏幕深处飞出来：direction = (0, 0, 1)；从左边飞进来：direction = (1, 0, 0)，依此类推。
 ## - 碰到玩家：发 SignalBus.enemy_hit_player 并调用玩家的 take_hit()，然后自己销毁。
-## - 被子弹打：扣 hp，归零后发 SignalBus.enemy_died 并销毁。
 ## 编队（数量、阵型）由 EnemyFormation 负责，单个敌机也可以直接摆进场景使用。
 
 ## 轨迹样式（定义在 EnemyPath，这里留个别名，Enemy.Pattern.SINE 这种写法照样能用）。
@@ -32,8 +31,6 @@ const Pattern = EnemyPath.Pattern
 @export var face_movement: bool = true
 
 @export_group("战斗")
-## 生命值（被几发子弹打中才爆）。
-@export var hp: float = 3.0
 ## 存活上限（秒），超时自动销毁，防止飞出画面后一直残留。
 @export var max_lifetime: float = 40.0
 ## 朝屏幕飞来的敌机，飞过玩家所在平面（世界 Z 超过这个值）后立刻销毁。
@@ -41,6 +38,10 @@ const Pattern = EnemyPath.Pattern
 @export var despawn_z: float = 100.0
 ## 横向/纵向飞出这个范围（世界 |X| 或 |Y|）后自动销毁。
 @export var despawn_xy: float = 40.0
+
+@export_group("擦边")
+## 离玩家（中心距离）多近飞过去算擦边（米）。没撞上才算。
+@export var graze_radius: float = 6.0
 
 @export_group("可读性")
 ## 显示落点标记：在玩家所在平面（z = 0）上画一个圈，标出这架敌机将会穿过的位置。
@@ -66,7 +67,7 @@ const Pattern = EnemyPath.Pattern
 var start_delay: float = 0.0
 ## 编队生成时指定的出发点（世界坐标）。为 null 时用敌机自己摆放的位置。
 var spawn_global_position: Variant = null
-## 被移除时回调 on_removed.call(killed: bool)：killed = 被打爆，false = 撞玩家/飞走。编队用它统计。
+## 被移除（撞到玩家 / 飞走）时回调 on_removed.call()，编队用它统计还剩几架。
 var on_removed: Callable
 
 var _origin: Vector3
@@ -74,6 +75,10 @@ var _time: float = 0.0
 var _side: Vector3
 var _up: Vector3
 var _removed: bool = false
+## 擦边检测：飞行过程中离玩家最近的距离；已经结算过就不再算。
+var _closest: float = INF
+var _grazed: bool = false
+var _player: Node3D
 
 ## 落点：穿过 z = 0 的时刻（飞行时间，<0 表示不会穿过）和位置。
 var _cross_time: float = -1.0
@@ -85,7 +90,7 @@ var _tint_mat: StandardMaterial3D
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
-	add_to_group(&"enemies")  # 瞄准框靠这个组找目标
+	add_to_group(&"enemies")
 	if model_scene:
 		for child: Node in $Model.get_children():
 			child.queue_free()
@@ -103,7 +108,7 @@ func _ready() -> void:
 	_setup_readability()
 
 
-## 等待出发时隐藏，且既不撞玩家、也不会被子弹打到。
+## 等待出发时隐藏，也不会撞到玩家。
 func _set_active(on: bool) -> void:
 	visible = on
 	set_deferred("monitoring", on)
@@ -120,11 +125,30 @@ func _physics_process(delta: float) -> void:
 	_time += delta
 	_update_transform(delta)
 	_update_readability()
+	_update_graze()
 
 	var p: Vector3 = global_position
 	var passed_player: bool = direction.z > 0.01 and p.z > despawn_z
 	if _time >= max_lifetime or passed_player or absf(p.x) > despawn_xy or absf(p.y) > despawn_xy:
-		_remove(false)
+		_remove()
+
+
+## 擦边：记下离玩家最近的距离；进入过擦边范围、又开始远离（说明已经擦过去了，没撞上）就结算一次。
+func _update_graze() -> void:
+	if _grazed:
+		return
+	if not is_instance_valid(_player):
+		_player = get_tree().get_first_node_in_group(&"player") as Node3D
+		if _player == null:
+			return
+	var d: float = global_position.distance_to(_player.global_position)
+	if d < _closest:
+		_closest = d
+	elif _closest <= graze_radius and d > _closest + 0.5:
+		_grazed = true
+		# 越近越值钱：closeness = 1 贴着飞过，0 刚好在擦边范围边缘
+		var closeness: float = clampf(1.0 - _closest / graze_radius, 0.0, 1.0)
+		SignalBus.player_grazed.emit(self, _closest, closeness)
 
 
 ## 按时间计算位置：沿前进方向走 + 横向摆动。
@@ -236,30 +260,21 @@ func _update_tint() -> void:
 	_tint_mat.albedo_color = c
 
 
-## 被子弹击中。
-func take_damage(amount: float) -> void:
-	if _removed:
-		return
-	hp -= amount
-	if hp <= 0:
-		SignalBus.enemy_died.emit(self)
-		_remove(true)
-
-
 func _on_body_entered(body: Node3D) -> void:
 	if _removed:
 		return
 	if body is PlayerPlane:
+		_grazed = true  # 撞上了就不算擦边
 		SignalBus.enemy_hit_player.emit(self, body)
 		(body as PlayerPlane).take_hit(self)
-		_remove(false)
+		_remove()
 
 
 ## 统一的移除出口：只通知一次编队，然后销毁。
-func _remove(killed: bool) -> void:
+func _remove() -> void:
 	if _removed:
 		return
 	_removed = true
 	if on_removed.is_valid():
-		on_removed.call(killed)
+		on_removed.call()
 	queue_free()

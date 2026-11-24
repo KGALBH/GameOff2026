@@ -35,6 +35,7 @@ var running: bool = false
 
 var _states: Array[_State] = []
 var _done_time: Array[float] = []
+var _start_time: Array[float] = []
 var _formations: Dictionary = {}   # EnemyFormation -> 波次序号
 var _finished_emitted: bool = false
 var _all_done_time: float = -1.0
@@ -62,11 +63,13 @@ func start() -> void:
 	_all_done_time = -1.0
 	_states.clear()
 	_done_time.clear()
+	_start_time.clear()
 	for w: WaveEntry in level.waves:
 		var skipped: bool = debug_start_time > 0.0 and w and w.trigger == WaveEntry.Trigger.AT_TIME and w.time < debug_start_time
 		_states.append(_State.DONE if skipped else _State.PENDING)
 		# 被跳过的波次算作"开局前就结束了"，后面接着它的 AFTER_PREVIOUS 波次会马上出发
 		_done_time.append(-INF if skipped else 0.0)
+		_start_time.append(-INF if skipped else INF)
 	_bus().emit_signal(&"level_started", level)
 
 
@@ -102,6 +105,9 @@ func _ready_time(i: int) -> float:
 		return 0.0
 	if w.trigger == WaveEntry.Trigger.AT_TIME or i == 0:
 		return w.time
+	if w.trigger == WaveEntry.Trigger.WITH_PREVIOUS:
+		# 上一波还没出发时 _start_time 是 INF
+		return _start_time[i - 1] + w.time
 	if _states[i - 1] != _State.DONE:
 		return INF
 	return _done_time[i - 1] + w.time
@@ -109,6 +115,7 @@ func _ready_time(i: int) -> float:
 
 func _spawn_wave(i: int) -> void:
 	var w: WaveEntry = level.waves[i]
+	_start_time[i] = elapsed
 	if w == null or w.formation == null:
 		_mark_done(i)
 		return
@@ -125,7 +132,7 @@ func _spawn_wave(i: int) -> void:
 	f.spawn()
 
 
-func _on_formation_finished(formation: Node3D, _killed: int, _total: int) -> void:
+func _on_formation_finished(formation: Node3D, _total: int) -> void:
 	if not _formations.has(formation):
 		return
 	var i: int = _formations[formation]

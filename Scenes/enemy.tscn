@@ -21,7 +21,6 @@ radius = 0.85
 [node name="Enemy" type="Area3D" unique_id=1730261215]
 script = ExtResource("1_script")
 pattern = 3
-hp = 1
 
 [node name="Model" type="Node3D" parent="." unique_id=1743889401]
 
